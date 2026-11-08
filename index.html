@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OPD Schedule Maker</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar no-print">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <div class="brand-name">OPD Schedule Maker</div>
+          <div class="brand-sub">Jobs &amp; lunches in a minute</div>
+        </div>
+      </div>
+      <label class="date-pick">
+        <span>Day</span>
+        <input type="date" id="date" />
+      </label>
+      <div class="top-actions">
+        <button class="btn ghost" id="btnHistory" type="button">Saved days</button>
+        <button class="btn ghost" id="btnSettings" type="button">Settings</button>
+      </div>
+    </header>
+
+    <nav class="steps no-print" id="steps">
+      <button type="button" data-step="import"><b>1</b> Add schedule</button>
+      <button type="button" data-step="review"><b>2</b> Check people</button>
+      <button type="button" data-step="schedule"><b>3</b> Jobs &amp; lunches</button>
+    </nav>
+
+    <main id="app" class="no-print"></main>
+
+    <dialog id="settingsDlg" class="dlg"></dialog>
+    <dialog id="historyDlg" class="dlg"></dialog>
+    <div id="toast" class="toast no-print" role="status" aria-live="polite"></div>
+    <div id="printArea" class="print-only"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" defer></script>
+    <script src="js/time.js"></script>
+    <script src="js/scheduler.js"></script>
+    <script src="js/parser.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="js/ocr.js"></script>
+    <script src="js/sheet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
+    <script src="js/pdf.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

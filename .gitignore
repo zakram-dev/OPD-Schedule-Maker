@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Test data and tests (kept local only)
+test-files/
+tests/
+
+# Saved schedules / backups / any data
+*.json
+!package.json
+*.csv
+*.xlsx
+*.xls
+*.ods
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.heic
+data/
+backups/
+
+# Build output and local tooling
+dist/
+.claude/
+.DS_Store
+*.bak

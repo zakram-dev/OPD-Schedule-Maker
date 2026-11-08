@@ -1,0 +1,20 @@
+# Run with:  docker compose up -d --build
+services:
+  web:
+    build: .
+    container_name: ogp-schedule-web
+    restart: unless-stopped
+    # Reachable on your home network at http://<laptop-ip>:8080 (handy for testing).
+    # Remove these two lines if you only want access through Cloudflare.
+    ports:
+      - "8080:80"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: ogp-schedule-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?Put your Cloudflare tunnel token in the .env file}
+    depends_on:
+      - web

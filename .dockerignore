@@ -1,0 +1,7 @@
+.env
+.claude
+tests
+test-files
+dist
+*.md
+.DS_Store
