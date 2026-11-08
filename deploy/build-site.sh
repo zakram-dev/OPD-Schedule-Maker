@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the production copy of the site into $1 (default: ./dist):
-#   - copies index.html, favicon-ogp-48x48.png, css/, js/, fonts/
+#   - copies the pages (index, privacy, terms), favicon, css/, js/, fonts/
 #   - downloads the free reading libraries (Tesseract, PDF.js, SheetJS) into vendor/
 #   - points the page at those local copies, so phones never need outside CDNs
 # Used by the Dockerfile; you can also run it by hand to test.
@@ -18,7 +18,7 @@ XLSX="0.18.5"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/vendor/tesseract-core" "$OUT/vendor/lang"
-cp "$SRC/index.html" "$SRC/favicon-ogp-48x48.png" "$OUT/"
+cp "$SRC/index.html" "$SRC/privacy.html" "$SRC/terms.html" "$SRC/favicon-ogp-48x48.png" "$OUT/"
 cp -R "$SRC/css" "$SRC/js" "$SRC/fonts" "$OUT/"
 rm -f "$OUT/fonts/README.md"
 
@@ -54,8 +54,8 @@ VER="$(cat "$OUT"/css/*.css "$OUT"/js/*.js | cksum | cut -d' ' -f1)"
 sed -i.bak -E \
   -e "s#href=\"css/([a-z]+)\.css\"#href=\"css/\1.css?v=$VER\"#g" \
   -e "s#src=\"js/([a-z]+)\.js\"#src=\"js/\1.js?v=$VER\"#g" \
-  "$OUT/index.html"
-rm -f "$OUT/index.html.bak"
+  "$OUT/index.html" "$OUT/privacy.html" "$OUT/terms.html"
+rm -f "$OUT"/*.html.bak
 echo "Asset version $VER"
 
 if grep -q "cdn.jsdelivr.net" "$OUT/index.html"; then

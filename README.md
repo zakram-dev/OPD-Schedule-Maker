@@ -65,3 +65,4 @@ it to another computer. (A shared online database is the next step for multi-dev
 - `js/sheet.js`: Excel / CSV reading (SheetJS)
 - `js/app.js`: the website screens
 - `css/styles.css` + `fonts/`: the look; see [DESIGN.md](DESIGN.md) for the design system
+- `privacy.html`, `terms.html`: the Privacy and Terms pages (Help lives inside `index.html`)

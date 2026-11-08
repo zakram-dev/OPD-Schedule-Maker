@@ -3,7 +3,7 @@
 FROM alpine:3.20 AS build
 RUN apk add --no-cache curl
 WORKDIR /src
-COPY index.html favicon-ogp-48x48.png ./
+COPY index.html privacy.html terms.html favicon-ogp-48x48.png ./
 COPY css ./css
 COPY js ./js
 COPY fonts ./fonts

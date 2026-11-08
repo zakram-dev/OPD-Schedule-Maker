@@ -56,6 +56,8 @@
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.9 4.9 1.4 1.4" /><path d="m17.7 17.7 1.4 1.4" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.3 17.7-1.4 1.4" /><path d="m19.1 4.9-1.4 1.4" /></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></symbol>
       <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" /></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></symbol>
     </svg>
 
@@ -96,6 +98,9 @@
           <button class="btn on-dark" id="btnSettings" type="button">
             <svg class="ic" aria-hidden="true"><use href="#i-sliders" /></svg><span class="lbl">Settings</span>
           </button>
+          <button class="btn on-dark" id="btnHelp" type="button">
+            <svg class="ic" aria-hidden="true"><use href="#i-help" /></svg><span class="lbl">Help</span>
+          </button>
         </div>
       </div>
     </header>
@@ -118,6 +123,102 @@
     </nav>
 
     <main id="app" class="no-print" tabindex="-1"></main>
+
+    <footer class="site-foot no-print">
+      <div class="site-foot-in">
+        <p class="foot-privacy">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>
+          <span><b>Private by design.</b> Schedules, photos and saved days stay in this browser on this device. They are never uploaded.</span>
+        </p>
+        <nav class="foot-links" aria-label="About this site">
+          <button type="button" class="foot-link" data-open-help>Help</button>
+          <a class="foot-link" href="privacy.html">Privacy</a>
+          <a class="foot-link" href="terms.html">Terms</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">Contact</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker" target="_blank" rel="noopener">Open source on GitHub</a>
+        </nav>
+        <p class="foot-legal">© 2026 OPD Schedule Maker · MIT License · Not affiliated with any employer</p>
+      </div>
+    </footer>
+
+    <dialog id="helpDlg" class="dlg dlg-help" aria-labelledby="helpTitle">
+      <header>
+        <div><p class="eyebrow">Help</p><h3 id="helpTitle">How it works</h3></div>
+        <button class="icon-btn" type="button" data-help-close aria-label="Close help"><svg class="ic" aria-hidden="true"><use href="#i-x" /></svg></button>
+      </header>
+      <div class="body help">
+        <ol class="help-steps">
+          <li><b>Add the schedule.</b> Upload screenshots, a PDF or an Excel / CSV file, or paste the list.</li>
+          <li><b>Check the people.</b> Fix any misread names or times and tick team leads.</li>
+          <li><b>Get jobs &amp; lunches.</b> Review the chart, change anything, then print or download.</li>
+        </ol>
+
+        <details class="help-item" open>
+          <summary>Getting a good screenshot</summary>
+          <ul>
+            <li>Show names on the left and shift times on the right, like the schedule list in the app.</li>
+            <li>Crop to the list. Several screenshots for one day are fine; add them all at once.</li>
+            <li>Dark-mode screenshots work. Blurry or tilted photos of paper don’t read well.</li>
+            <li>iPhone camera photos (HEIC) can’t be read. Take a screenshot instead.</li>
+            <li>Nothing found? Paste the list as text, one person per line: <code>Alice T 5:00 AM - 2:00 PM</code>. Add <code>TL</code> for team leads.</li>
+          </ul>
+        </details>
+
+        <details class="help-item">
+          <summary>Jobs and colors</summary>
+          <ul class="help-legend">
+            <li class="r-PICK"><i class="sw"></i><span><b>Picker</b>: picks orders.</span></li>
+            <li class="r-DISP"><i class="sw"></i><span><b>Dispenser</b>: loads customer cars.</span></li>
+            <li class="r-BR"><i class="sw"></i><span><b>Backroom (BR)</b>: stages totes. One person.</span></li>
+            <li class="r-PREP"><i class="sw"></i><span><b>Prep (PR)</b>: preps orders and deliveries. One person.</span></li>
+            <li class="r-SM"><i class="sw"></i><span><b>SM / EXP</b>: one person.</span></li>
+            <li class="r-TL"><i class="sw"></i><span><b>Team lead</b>: runs the department; no job or lunch.</span></li>
+            <li><i class="sw sw-lunch"></i><span>Yellow is always lunch. A dashed box means someone is covering a lunch.</span></li>
+          </ul>
+          <p class="help-note">The picker / dispenser mix follows the time of day, and a picker or dispenser covers lunch for each one-person job.</p>
+        </details>
+
+        <details class="help-item">
+          <summary>Lunch rules</summary>
+          <ul>
+            <li>By default: shifts under 6 hours get no lunch, 6-hour shifts get 30 minutes, longer shifts get 1 hour.</li>
+            <li>Lunch starts at least 3 hours into the shift, and lunches are spread out so the floor stays covered.</li>
+            <li>Change the rules any time in <b>Settings</b>.</li>
+          </ul>
+        </details>
+
+        <details class="help-item">
+          <summary>Changing the schedule</summary>
+          <ul>
+            <li>Select anyone in the chart, or use <b>Edit jobs &amp; lunches</b>, to change their job, lunch or cover.</li>
+            <li>Your changes are marked <b>Edited</b> and kept when you press <b>Redo schedule</b>.</li>
+            <li><b>Try another mix</b> gives a different, equally valid plan. <b>Undo my edits</b> lets the app choose again.</li>
+            <li>Yellow warnings mean something needs a person to decide, like nobody being available for a job at the end of the night.</li>
+            <li>Jobs rotate across saved days, so people don’t get the same job all week.</li>
+          </ul>
+        </details>
+
+        <details class="help-item">
+          <summary>Saving, backups and other devices</summary>
+          <ul>
+            <li>Everything saves automatically in this browser. Use the arrows next to the date to switch days.</li>
+            <li>Each device keeps its own data. To move it, open <b>Saved days → Download backup</b>, then <b>Restore from backup</b> on the other device.</li>
+            <li>Clearing your browser history or site data erases saved days, so keep a backup.</li>
+            <li>On a shared computer, anyone using the same browser can see saved days. Use <b>Erase everything</b> when you’re done.</li>
+          </ul>
+        </details>
+
+        <details class="help-item">
+          <summary>Printing</summary>
+          <ul>
+            <li><b>Print</b> gives a simple table to post. <b>Print chart</b> prints the color lunch chart in landscape.</li>
+            <li>Turn on “Background graphics” in the print window if the colors don’t show.</li>
+          </ul>
+        </details>
+
+        <p class="help-foot">Still stuck or found a problem? <a href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">Open an issue on GitHub</a>. Please don’t post real names or schedules there; it’s public.</p>
+      </div>
+    </dialog>
 
     <dialog id="settingsDlg" class="dlg" aria-labelledby="settingsTitle"></dialog>
     <dialog id="historyDlg" class="dlg" aria-labelledby="historyTitle"></dialog>

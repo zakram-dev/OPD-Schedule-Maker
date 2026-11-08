@@ -1397,5 +1397,20 @@
     }
   });
 
+  // ------------------------------------------------------------------ help dialog (static content in index.html)
+  const helpDlg = $('#helpDlg');
+  const openHelp = () => {
+    if (!helpDlg.open) helpDlg.showModal();
+  };
+  $('#btnHelp').addEventListener('click', openHelp);
+  document.querySelectorAll('[data-open-help]').forEach((b) => b.addEventListener('click', openHelp));
+  helpDlg.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-help-close]')) helpDlg.close();
+  });
+  helpDlg.addEventListener('close', () => {
+    if (location.hash === '#help') history.replaceState(null, '', location.pathname + location.search);
+  });
+
   render();
+  if (location.hash === '#help') openHelp(); // linked from the Privacy and Terms pages
 })();

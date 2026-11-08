@@ -369,6 +369,7 @@ kbd {
   font-size: 0.9375rem;
   line-height: 1.1;
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
   box-shadow: 0 1px 0 rgba(21, 23, 28, 0.04);
   transition: background-color var(--t-fast) ease, border-color var(--t-fast) ease, color var(--t-fast) ease,
@@ -2537,6 +2538,254 @@ tbody tr:last-child > * {
 }
 
 /* =====================================================================
+   Footer, Help panel and reading pages (Privacy, Terms)
+   ===================================================================== */
+.site-foot {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.site-foot-in {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: var(--s-6) var(--gutter) calc(var(--s-6) + env(safe-area-inset-bottom));
+  display: grid;
+  gap: var(--s-3);
+}
+.foot-privacy {
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-start;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.foot-privacy .ic {
+  margin-top: 2px;
+  color: var(--ok);
+}
+.foot-privacy b {
+  color: var(--ink);
+}
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-1);
+  margin-left: calc(var(--s-2) * -1);
+}
+.foot-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  transition: text-decoration-color var(--t-fast) ease, background-color var(--t-fast) ease;
+}
+.foot-link:hover {
+  text-decoration-color: var(--signal);
+  background: var(--surface-2);
+}
+.foot-legal {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+/* Help panel */
+.help {
+  font-size: 0.9375rem;
+}
+.help-steps {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-5);
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.help-steps li {
+  position: relative;
+  padding: var(--s-3) var(--s-4) var(--s-3) 52px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  counter-increment: step;
+}
+.help-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: var(--s-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+.help-item {
+  border-bottom: 1px solid var(--line);
+}
+.help-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 52px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.125rem;
+  cursor: pointer;
+  list-style: none;
+}
+.help-item summary::-webkit-details-marker {
+  display: none;
+}
+.help-item summary::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  flex: none;
+  background: var(--chev) no-repeat center / 12px;
+  transition: transform var(--t-base) var(--ease-out);
+}
+.help-item[open] summary::after {
+  transform: rotate(180deg);
+}
+.help-item ul {
+  margin: 0 0 var(--s-4);
+  padding-left: 1.2em;
+  color: var(--ink-2);
+}
+.help-item li {
+  padding: 3px 0;
+}
+.help-item li::marker {
+  color: var(--ink-3);
+}
+.help-legend {
+  padding-left: 0 !important;
+  list-style: none;
+}
+.help-legend li {
+  display: flex;
+  gap: var(--s-2);
+  align-items: baseline;
+}
+.help-legend .sw {
+  transform: translateY(-1px);
+}
+.help-note {
+  margin: calc(var(--s-2) * -1) 0 var(--s-4);
+  color: var(--ink-2);
+}
+.help-foot {
+  margin-top: var(--s-5);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+}
+.help a,
+.doc a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* reading pages */
+.doc-top .topbar-in {
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'brand actions';
+}
+.brand-link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--r-md);
+}
+.doc {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--s-8) var(--gutter) var(--s-12);
+}
+.doc-card {
+  padding: var(--s-6) var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.doc .view-sub {
+  margin-bottom: var(--s-6);
+}
+.doc-summary {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-6);
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--ok-soft);
+  list-style: none;
+}
+.doc-summary li {
+  display: flex;
+  gap: var(--s-2);
+  align-items: flex-start;
+}
+.doc-summary .ic {
+  margin-top: 3px;
+  color: var(--ok);
+}
+.doc-summary.warn {
+  background: var(--warn-soft);
+}
+.doc-summary.warn .ic {
+  color: var(--warn-ink);
+}
+.doc h2 {
+  margin: var(--s-8) 0 var(--s-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}
+.doc h2:first-of-type {
+  margin-top: 0;
+}
+.doc p,
+.doc ul {
+  margin: 0 0 var(--s-3);
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+.doc ul {
+  padding-left: 1.2em;
+}
+.doc li {
+  padding: 2px 0;
+}
+.doc strong {
+  color: var(--ink);
+}
+.doc-meta {
+  margin-top: var(--s-6) !important;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--ink-3) !important;
+}
+
+/* =====================================================================
    Motion: entrance when the screen changes (never on in-place edits)
    ===================================================================== */
 @keyframes rise {
@@ -2851,6 +3100,9 @@ tbody tr:last-child > * {
   :root {
     --gutter: 24px;
   }
+  .doc-card {
+    padding: var(--s-8) var(--s-10);
+  }
   .step-l .long {
     display: inline;
   }
@@ -2904,6 +3156,14 @@ tbody tr:last-child > * {
 @media (min-width: 900px) {
   :root {
     --gutter: 32px;
+  }
+  .site-foot-in {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--s-8);
+  }
+  .foot-legal {
+    grid-column: 1 / -1;
   }
   .topbar-in {
     grid-template-columns: 1fr auto 1fr;

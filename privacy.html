@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#15171c" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="How OPD Schedule Maker handles your schedules, photos and saved days: everything stays in your browser." />
+    <script>
+      (function () {
+        var t = 'light';
+        try { t = localStorage.getItem('opd-schedule-maker:theme') || 'light'; } catch (e) {}
+        if (t === 'auto') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+      })();
+    </script>
+    <title>Privacy · OPD Schedule Maker</title>
+    <link rel="icon" type="image/png" sizes="48x48" href="favicon-ogp-48x48.png" />
+    <link rel="preload" href="fonts/barlow-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true">
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></symbol>
+    </svg>
+
+    <header class="topbar doc-top">
+      <div class="topbar-in">
+        <a class="brand brand-link" href="./">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="7" fill="#FFC933" />
+            <rect x="6" y="8" width="14" height="4" rx="2" fill="#15171C" />
+            <rect x="6" y="14.5" width="6" height="4" rx="2" fill="#15171C" />
+            <rect x="17" y="14.5" width="9" height="4" rx="2" fill="#15171C" />
+            <rect x="12" y="21" width="14" height="4" rx="2" fill="#15171C" opacity=".5" />
+          </svg>
+          <span class="brand-text">
+            <span class="brand-name">OPD Schedule Maker</span>
+            <span class="brand-sub">Jobs &amp; lunches, planned in a minute</span>
+          </span>
+        </a>
+        <div class="top-actions">
+          <a class="btn on-dark" href="./"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left" /></svg><span class="lbl">Back to the app</span></a>
+        </div>
+      </div>
+    </header>
+
+    <main class="doc" id="main">
+      <p class="eyebrow">Privacy</p>
+      <h1 class="view-title">Your schedules stay with you</h1>
+      <p class="view-sub">The short version first, then the details. Last updated November 8, 2026.</p>
+
+      <article class="doc-card">
+        <ul class="doc-summary">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check-circle" /></svg><span>Screenshots, PDFs and spreadsheets are read <strong>inside your browser</strong>. They are never uploaded.</span></li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check-circle" /></svg><span>Saved days, team leads and settings are stored <strong>in this browser on this device only</strong>.</span></li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check-circle" /></svg><span><strong>No accounts, no ads, no analytics, no tracking.</strong></span></li>
+        </ul>
+
+        <h2>What the app does with your files</h2>
+        <p>Reading screenshots and scanned PDFs, reading spreadsheets, and making the jobs and lunches all happen on your own device, using code that this website sends to your browser. The files you choose never leave your device. Our server only sends the website itself.</p>
+
+        <h2>What is stored, and where</h2>
+        <p>The app saves the following in your browser’s storage for this site:</p>
+        <ul>
+          <li>the people and shift times you add, and the jobs and lunches for each day,</li>
+          <li>which people are team leads, so the app remembers them next time,</li>
+          <li>your settings and your light or dark preference.</li>
+        </ul>
+        <p>None of this is stored on our server. We can’t see it, and we can’t recover it for you. Backups, CSV files and printouts you create are saved wherever you choose. They contain names, so keep them safe.</p>
+
+        <h2>Things to know</h2>
+        <ul>
+          <li><strong>Clearing your browser data erases saved days.</strong> Use <em>Saved days → Download backup</em> to keep a copy.</li>
+          <li><strong>Shared computers:</strong> anyone using the same browser can see saved days. Use <em>Saved days → Erase everything</em> when you’re done.</li>
+          <li><strong>Each device is separate.</strong> Nothing syncs between phones or computers.</li>
+        </ul>
+
+        <h2>Hosting and Cloudflare</h2>
+        <p>The site runs on a small private server and is delivered through Cloudflare, which protects and speeds up the connection. Like any website, delivering pages involves standard technical information such as your IP address, browser type and the time of the visit, which Cloudflare and the server may keep briefly in security logs. They never receive your schedules, photos or files.</p>
+        <p>The app itself sets no cookies. Cloudflare may set a strictly necessary security cookie. If the site asks you to sign in with an email code, that sign-in is handled by Cloudflare Access, which sees your email address. See <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare’s privacy policy</a>.</p>
+
+        <h2>Information about coworkers</h2>
+        <p>Schedules contain coworkers’ names. Only add names and shift times, nothing else such as phone numbers or employee IDs, and follow your employer’s rules about sharing schedules.</p>
+
+        <h2>Check it yourself</h2>
+        <p>The code is open source, so anyone can confirm how it works: <a href="https://github.com/zakram-dev/OPD-Schedule-Maker" target="_blank" rel="noopener">OPD Schedule Maker on GitHub</a>.</p>
+
+        <h2>Changes</h2>
+        <p>If this ever changes, for example by adding optional shared storage, this page will be updated before it happens and the date above will change.</p>
+
+        <h2>Questions</h2>
+        <p>Open an issue on <a href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">GitHub</a>. It’s public, so please don’t include real names or schedules.</p>
+
+        <p class="doc-meta">See also the <a href="terms.html">Terms of use</a> and <a href="./#help">Help</a>.</p>
+      </article>
+    </main>
+
+    <footer class="site-foot">
+      <div class="site-foot-in">
+        <p class="foot-privacy">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>
+          <span><b>Private by design.</b> Schedules, photos and saved days stay in this browser on this device. They are never uploaded.</span>
+        </p>
+        <nav class="foot-links" aria-label="About this site">
+          <a class="foot-link" href="./#help">Help</a>
+          <a class="foot-link" href="privacy.html" aria-current="page">Privacy</a>
+          <a class="foot-link" href="terms.html">Terms</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">Contact</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker" target="_blank" rel="noopener">Open source on GitHub</a>
+        </nav>
+        <p class="foot-legal">© 2026 OPD Schedule Maker · MIT License · Not affiliated with any employer</p>
+      </div>
+    </footer>
+  </body>
+</html>

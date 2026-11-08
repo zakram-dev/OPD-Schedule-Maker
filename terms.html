@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#15171c" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Terms of use for OPD Schedule Maker, a free, open-source scheduling helper." />
+    <script>
+      (function () {
+        var t = 'light';
+        try { t = localStorage.getItem('opd-schedule-maker:theme') || 'light'; } catch (e) {}
+        if (t === 'auto') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+      })();
+    </script>
+    <title>Terms of use · OPD Schedule Maker</title>
+    <link rel="icon" type="image/png" sizes="48x48" href="favicon-ogp-48x48.png" />
+    <link rel="preload" href="fonts/barlow-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none" aria-hidden="true">
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4" /><path d="M12 17h.01" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></symbol>
+    </svg>
+
+    <header class="topbar doc-top">
+      <div class="topbar-in">
+        <a class="brand brand-link" href="./">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="7" fill="#FFC933" />
+            <rect x="6" y="8" width="14" height="4" rx="2" fill="#15171C" />
+            <rect x="6" y="14.5" width="6" height="4" rx="2" fill="#15171C" />
+            <rect x="17" y="14.5" width="9" height="4" rx="2" fill="#15171C" />
+            <rect x="12" y="21" width="14" height="4" rx="2" fill="#15171C" opacity=".5" />
+          </svg>
+          <span class="brand-text">
+            <span class="brand-name">OPD Schedule Maker</span>
+            <span class="brand-sub">Jobs &amp; lunches, planned in a minute</span>
+          </span>
+        </a>
+        <div class="top-actions">
+          <a class="btn on-dark" href="./"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left" /></svg><span class="lbl">Back to the app</span></a>
+        </div>
+      </div>
+    </header>
+
+    <main class="doc" id="main">
+      <p class="eyebrow">Terms of use</p>
+      <h1 class="view-title">A free tool, used with care</h1>
+      <p class="view-sub">The short version first, then the details. Last updated November 8, 2026.</p>
+
+      <article class="doc-card">
+        <ul class="doc-summary warn">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-alert" /></svg><span>This is a <strong>free tool, provided as-is</strong>.</span></li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-alert" /></svg><span>Schedules are <strong>suggestions</strong>. A team lead must check them before they are used.</span></li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-alert" /></svg><span>It is <strong>not affiliated with or endorsed by any employer</strong>.</span></li>
+        </ul>
+
+        <h2>Using the site</h2>
+        <p>You may use OPD Schedule Maker for free to plan jobs and lunches. Only enter names and shift times that you are allowed to use, and don’t try to disrupt or overload the site.</p>
+
+        <h2>Schedules are suggestions</h2>
+        <p>The app follows the rules you set, but it can make mistakes, and photo reading can misread names or times. <strong>You are responsible for checking every schedule</strong> against labor laws, break rules and your employer’s policies before you use, post or share it.</p>
+
+        <h2>No warranty</h2>
+        <p>The site and its code are provided “as is”, without warranty of any kind, as stated in the MIT License. The site may change, have errors, or be unavailable at times.</p>
+
+        <h2>Limitation of liability</h2>
+        <p>To the extent allowed by law, the authors are not liable for any loss or damage from using the site, including scheduling mistakes, missed breaks or lost data. Your data lives only in your browser, so keep a backup (<em>Saved days → Download backup</em>).</p>
+
+        <h2>Not affiliated with any employer</h2>
+        <p>This is an independent project. It is not affiliated with, endorsed by or sponsored by any employer or retailer. Job names describe common store roles.</p>
+
+        <h2>Open source</h2>
+        <p>The code is available on <a href="https://github.com/zakram-dev/OPD-Schedule-Maker" target="_blank" rel="noopener">GitHub</a> under the MIT License, which governs any use of the code. The Barlow fonts are used under the SIL Open Font License.</p>
+
+        <h2>Changes</h2>
+        <p>These terms may be updated. The date above shows the latest version, and using the site after a change means you accept the updated terms.</p>
+
+        <h2>Questions</h2>
+        <p>Open an issue on <a href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">GitHub</a>. It’s public, so please don’t include real names or schedules.</p>
+
+        <p class="doc-meta">See also the <a href="privacy.html">Privacy</a> page and <a href="./#help">Help</a>.</p>
+      </article>
+    </main>
+
+    <footer class="site-foot">
+      <div class="site-foot-in">
+        <p class="foot-privacy">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield" /></svg>
+          <span><b>Private by design.</b> Schedules, photos and saved days stay in this browser on this device. They are never uploaded.</span>
+        </p>
+        <nav class="foot-links" aria-label="About this site">
+          <a class="foot-link" href="./#help">Help</a>
+          <a class="foot-link" href="privacy.html">Privacy</a>
+          <a class="foot-link" href="terms.html" aria-current="page">Terms</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker/issues" target="_blank" rel="noopener">Contact</a>
+          <a class="foot-link" href="https://github.com/zakram-dev/OPD-Schedule-Maker" target="_blank" rel="noopener">Open source on GitHub</a>
+        </nav>
+        <p class="foot-legal">© 2026 OPD Schedule Maker · MIT License · Not affiliated with any employer</p>
+      </div>
+    </footer>
+  </body>
+</html>
