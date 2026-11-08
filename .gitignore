@@ -17,6 +17,7 @@ tests/
 *.pdf
 *.jpg
 *.jpeg
+!favicon-ogp.jpeg
 *.png
 *.heic
 data/
