@@ -35,7 +35,7 @@ libraries, about 10 MB). After that the browser caches them.
 
 ## Put it online
 
-See [DEPLOY.md](DEPLOY.md): Docker + Cloudflare Tunnel on an Ubuntu laptop, at https://zee-ogp.space.
+See [DEPLOY.md](DEPLOY.md): hosted free on Cloudflare Pages at https://zee-ogp.space (a Docker + Cloudflare Tunnel setup for a home server is also included).
 
 ## Rules built in (all changeable in Settings)
 

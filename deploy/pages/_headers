@@ -1,0 +1,14 @@
+# Cloudflare Pages response headers (same protections the nginx setup used)
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Reading libraries never change for a given version
+/vendor/*
+  Cache-Control: public, max-age=2592000, immutable
+
+# Self-hosted fonts
+/fonts/*
+  Cache-Control: public, max-age=2592000

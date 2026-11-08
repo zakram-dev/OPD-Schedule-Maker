@@ -21,6 +21,8 @@ mkdir -p "$OUT/vendor/tesseract-core" "$OUT/vendor/lang"
 cp "$SRC/index.html" "$SRC/privacy.html" "$SRC/terms.html" "$SRC/favicon-ogp-48x48.png" "$OUT/"
 cp -R "$SRC/css" "$SRC/js" "$SRC/fonts" "$OUT/"
 rm -f "$OUT/fonts/README.md"
+# Cloudflare Pages settings (headers + short links); ignored by the Docker/nginx setup
+if [ -d "$SRC/deploy/pages" ]; then cp "$SRC/deploy/pages/_headers" "$SRC/deploy/pages/_redirects" "$OUT/"; fi
 
 fetch() { # url dest
   echo "  downloading $(basename "$2")"

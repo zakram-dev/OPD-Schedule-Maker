@@ -1,4 +1,28 @@
-# Putting it online: Ubuntu laptop + Docker + Cloudflare Tunnel
+# Putting it online
+
+## Recommended: Cloudflare Pages (no servers to run)
+
+The site is only files (all the work happens in each person's browser), so Cloudflare Pages hosts it
+for free on its global network. It keeps working through power, internet or hardware problems at
+home, and every push to GitHub updates the site automatically.
+
+Pages settings (Workers & Pages → Create → Pages → Import an existing Git repository):
+
+| Setting | Value |
+|---|---|
+| Repository | `zakram-dev/OPD-Schedule-Maker`, branch `main` |
+| Framework preset | None |
+| Build command | `sh deploy/build-site.sh dist` |
+| Build output directory | `dist` |
+
+The build downloads the reading libraries and bundles them, like the Docker image does.
+`deploy/pages/_headers` sets the security headers and caching, and `deploy/pages/_redirects` makes
+`/tip` point to the Ko-fi page. Add `zee-ogp.space` and `www.zee-ogp.space` under the project's
+**Custom domains** (remove the old tunnel routes for those names first).
+
+---
+
+# Alternative: Ubuntu laptop + Docker + Cloudflare Tunnel
 
 Result: the site is live at **https://zee-ogp.space**, served from your old laptop, with no ports
 opened on your home router. Cloudflare provides the https certificate for free.
