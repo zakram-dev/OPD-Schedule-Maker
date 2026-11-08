@@ -14,6 +14,14 @@
   };
   const niceDate = (iso, opts) =>
     new Date(iso + 'T12:00:00').toLocaleDateString(undefined, opts || { weekday: 'long', month: 'long', day: 'numeric' });
+  const addDays = (iso, n) => {
+    const d = new Date(iso + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${T.pad(d.getMonth() + 1)}-${T.pad(d.getDate())}`;
+  };
+  // inline SVG icon from the sprite in index.html (decorative; buttons carry their own text or aria-label)
+  const icon = (name, cls) => `<svg class="ic${cls ? ' ' + cls : ''}" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
+  const PLURAL = { PICK: 'Pickers', DISP: 'Dispensers', BR: 'Backroom', PREP: 'Prep', SM: 'SM / EXP', TL: 'Team leads' };
 
   let db = Store.load();
   let settings = Sched.mergeSettings(db.settings);
@@ -120,24 +128,55 @@
   }
 
   // ------------------------------------------------------------------ render
+  let lastScreen = '';
+  let enterTimer = null;
   function render() {
     if (!state.step) state.step = defaultStep();
     const d = db.days[state.date];
     const hasRows = !!(d && d.rows && d.rows.length);
+    const hasPeople = !!(d && d.employees && d.employees.length);
+    if (state.step === 'schedule' && !hasRows) state.step = 'review';
     document.querySelectorAll('#steps button').forEach((b) => {
-      b.classList.toggle('active', b.dataset.step === state.step);
-      b.disabled = b.dataset.step === 'schedule' && !hasRows;
+      const s = b.dataset.step;
+      const active = s === state.step;
+      b.classList.toggle('active', active);
+      b.classList.toggle('done', !active && ((s === 'import' && hasPeople) || (s === 'review' && hasRows)));
+      if (active) b.setAttribute('aria-current', 'step');
+      else b.removeAttribute('aria-current');
+      b.disabled = s === 'schedule' && !hasRows;
     });
     $('#date').value = state.date;
-    if (state.step === 'schedule' && !hasRows) state.step = 'review';
+    $('#dayToday').disabled = state.date === todayISO();
     app.innerHTML = state.step === 'import' ? viewImport() : state.step === 'review' ? viewReview() : viewSchedule();
+    // entrance motion only when the screen changes, never on in-place edits
+    const screen = state.date + '|' + state.step + '|' + (state.step === 'schedule' ? state.view : '');
+    if (screen !== lastScreen) {
+      lastScreen = screen;
+      app.classList.remove('enter');
+      void app.offsetWidth;
+      app.classList.add('enter');
+      clearTimeout(enterTimer);
+      enterTimer = setTimeout(() => app.classList.remove('enter'), 1200);
+    }
   }
 
   function noticeHTML() {
     if (!state.notice) return '';
     const n = state.notice;
     state.notice = null;
-    return `<div class="alerts ${n.kind === 'ok' ? 'ok' : 'warn'}" style="font-weight:500">${n.html}</div>`;
+    const ok = n.kind === 'ok';
+    return `<div class="notice ${ok ? 'ok' : 'warn'}" role="status">${icon(ok ? 'check-circle' : 'alert', 'notice-ic')}<div>${n.html}</div></div>`;
+  }
+
+  function viewHead(eyebrow, title, sub, aside) {
+    return `<header class="view-head">
+      <div class="view-head-main">
+        <p class="eyebrow">${eyebrow}</p>
+        <h1 class="view-title">${title}</h1>
+        ${sub ? `<p class="view-sub">${sub}</p>` : ''}
+      </div>
+      ${aside ? `<div class="view-head-aside">${aside}</div>` : ''}
+    </header>`;
   }
 
   // ---- step 1: import
@@ -150,57 +189,83 @@
       .filter((k) => k !== state.date && db.days[k].employees && db.days[k].employees.length)
       .sort()
       .pop();
+    const weekday = new Date(state.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long' });
+    const pct = prog ? Math.round(((prog.i + Math.min(1, prog.f || 0)) / n) * 100) : 0;
     return `
+      ${viewHead('Step 1 of 3 · Add schedule', `Who’s working ${esc(weekday)}?`, `${esc(niceDate(state.date))}. Add the day’s schedule and the app reads the names and shift times for you.`)}
       ${noticeHTML()}
-      <div class="card">
-        <h2>Add the schedule for ${esc(niceDate(state.date))}</h2>
-        <p class="sub">Upload screenshots or a PDF of the day’s schedule showing names and shift times, or an Excel / CSV file. You can add several at once, or paste a screenshot with Ctrl/⌘+V.</p>
-        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose screenshots, a PDF or a spreadsheet">
-          <strong>Drop screenshots, a PDF or an Excel file here, or click to choose</strong>
-          <span class="muted small">JPG, PNG, PDF, XLSX or CSV · reading happens on this device, free</span>
-        </div>
-        <input type="file" id="fileIn" accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,.ods" multiple hidden />
-        ${
-          n
-            ? `<div class="thumbs">${state.files
-                .map(
-                  (f, i) =>
-                    `<div class="thumb">${
-                      f.pdf ? `<div class="pdf-tile"><b>PDF</b><span>${esc(f.file.name)}</span></div>` : `<img src="${f.url}" alt="screenshot ${i + 1}" />`
-                    }${state.reading ? '' : `<button type="button" data-act="rm-file" data-i="${i}" aria-label="Remove">✕</button>`}</div>`
-                )
-                .join('')}</div>`
-            : ''
-        }
-        ${
-          state.reading && prog
-            ? `<div style="margin-top:14px"><div class="small" id="progLabel">${esc(prog.label)} file ${prog.i + 1} of ${n}…</div>
-               <div class="progress"><div id="progBar" style="width:${Math.round(((prog.i + Math.min(1, prog.f || 0)) / n) * 100)}%"></div></div></div>`
-            : ''
-        }
-        <div class="row" style="margin-top:14px">
-          <button class="btn primary big" type="button" data-act="read" ${!n || state.reading ? 'disabled' : ''}>
-            ${state.reading ? 'Reading…' : n ? `Read ${n} file${n > 1 ? 's' : ''}` : 'Read files'}
-          </button>
-          ${have ? `<span class="muted small">This day already has ${have} people; new ones get added to the list.</span>` : ''}
-        </div>
-      </div>
-      <div class="grid2">
-        <div class="card">
-          <h2>Or paste / type the list</h2>
-          <p class="sub">One person per line, like <code>Alice T 5:00 AM - 2:00 PM</code>. Add <code>TL</code> for team leads.</p>
-          <textarea id="pasteText" placeholder="Alice T 5:00 AM - 2:00 PM&#10;Bob J 5:30 AM - 10:30 AM&#10;Caleb S 6:00 AM - 3:00 PM TL&#10;Dana K 1:00 PM - 10:00 PM"></textarea>
-          <div class="row" style="margin-top:10px"><button class="btn" type="button" data-act="paste">Add these people</button></div>
-        </div>
-        <div class="card">
-          <h2>Other ways to start</h2>
-          <p class="sub">Handy when you’re testing, or when the schedule barely changed.</p>
-          <div style="display:grid;gap:8px">
-            <button class="btn" type="button" data-act="copy-prev" ${lastSaved ? '' : 'disabled'}>
-              Copy people from ${lastSaved ? esc(niceDate(lastSaved, { weekday: 'short', month: 'short', day: 'numeric' })) : 'a saved day'}
-            </button>
-            <button class="btn" type="button" data-act="manual">Type people in by hand</button>
+      <div class="import-grid">
+        <section class="panel panel-drop" aria-labelledby="dropTitle">
+          <div class="drop${state.reading ? ' busy' : ''}" id="drop" tabindex="0" role="button" aria-describedby="dropHint" aria-label="Choose screenshots, a PDF or a spreadsheet">
+            <span class="drop-ic">${icon('upload')}</span>
+            <strong class="drop-title" id="dropTitle"><span class="on-fine">Drop screenshots, a PDF or a spreadsheet</span><span class="on-touch">Choose screenshots, a PDF or a spreadsheet</span></strong>
+            <span class="drop-hint" id="dropHint"><span class="on-fine">or <span class="link">browse your files</span> · you can also paste a screenshot with <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>V</kbd></span><span class="on-touch">Tap to pick from <span class="link">Photos or Files</span></span></span>
+            <span class="formats" aria-hidden="true"><span>JPG</span><span>PNG</span><span>PDF</span><span>XLSX</span><span>CSV</span></span>
           </div>
+          <input type="file" id="fileIn" accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,.ods" multiple hidden />
+          ${
+            n
+              ? `<ul class="thumbs" aria-label="Files ready to read">${state.files
+                  .map(
+                    (f, i) =>
+                      `<li class="thumb">${
+                        f.pdf
+                          ? `<div class="pdf-tile">${icon('file')}<b>PDF</b><span>${esc(f.file.name)}</span></div>`
+                          : `<img src="${f.url}" alt="Screenshot ${i + 1}: ${esc(f.file.name)}" />`
+                      }${state.reading ? '' : `<button type="button" class="thumb-x" data-act="rm-file" data-i="${i}" aria-label="Remove ${esc(f.file.name)}">${icon('x')}</button>`}</li>`
+                  )
+                  .join('')}</ul>`
+              : ''
+          }
+          ${
+            state.reading && prog
+              ? `<div class="reading" role="status">
+                   <div class="reading-row"><span id="progLabel">${esc(prog.label)} file ${prog.i + 1} of ${n}…</span><span class="reading-pct" id="progPct">${pct}%</span></div>
+                   <div class="progress"><div id="progBar" style="width:${pct}%"></div></div>
+                 </div>`
+              : ''
+          }
+          <div class="panel-foot">
+            <p class="privacy">${icon('shield')}<span>Files are read on this device. Nothing is uploaded.</span></p>
+            <div class="foot-actions">
+              ${have ? `<span class="hint">${have} already on this day; new people are added.</span>` : ''}
+              <button class="btn primary big" type="button" data-act="read" ${!n || state.reading ? 'disabled' : ''}>
+                ${state.reading ? '<span class="spinner" aria-hidden="true"></span>Reading…' : n ? `Read ${n} file${n > 1 ? 's' : ''}${icon('arrow-right')}` : 'Read files'}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div class="import-side">
+          <section class="panel" aria-labelledby="pasteTitle">
+            <div class="panel-head">
+              <span class="panel-ic">${icon('clipboard')}</span>
+              <div><h2 id="pasteTitle">Paste or type the list</h2>
+              <p class="panel-sub">One person per line. Add <code>TL</code> for team leads.</p></div>
+            </div>
+            <label class="sr-only" for="pasteText">Schedule list</label>
+            <textarea id="pasteText" spellcheck="false" placeholder="Alice T 5:00 AM - 2:00 PM&#10;Bob J 5:30 AM - 10:30 AM&#10;Caleb S 6:00 AM - 3:00 PM TL&#10;Dana K 1:00 PM - 10:00 PM"></textarea>
+            <div class="panel-actions"><button class="btn" type="button" data-act="paste">${icon('plus')}Add these people</button></div>
+          </section>
+          <section class="panel" aria-labelledby="otherTitle">
+            <div class="panel-head">
+              <span class="panel-ic">${icon('copy')}</span>
+              <div><h2 id="otherTitle">Other ways to start</h2>
+              <p class="panel-sub">Handy when the schedule barely changed.</p></div>
+            </div>
+            <div class="stack">
+              <button class="option" type="button" data-act="copy-prev" ${lastSaved ? '' : 'disabled'}>
+                <span class="option-t">Copy people from ${lastSaved ? esc(niceDate(lastSaved, { weekday: 'short', month: 'short', day: 'numeric' })) : 'a saved day'}</span>
+                <span class="option-d">${lastSaved ? 'Same names and shifts, then adjust' : 'No saved days yet'}</span>
+                ${icon('chevron-right', 'option-go')}
+              </button>
+              <button class="option" type="button" data-act="manual">
+                <span class="option-t">Type people in by hand</span>
+                <span class="option-d">Start with an empty row</span>
+                ${icon('chevron-right', 'option-go')}
+              </button>
+            </div>
+          </section>
         </div>
       </div>`;
   }
@@ -215,58 +280,65 @@
     const seenNames = new Map();
     for (const e of emps) if (e.name) seenNames.set(Sched.nameKey(e.name), (seenNames.get(Sched.nameKey(e.name)) || 0) + 1);
     const dupes = new Set([...seenNames].filter(([, n]) => n > 1).map(([k]) => k));
+    const stats = `<dl class="stats">
+        <div><dt>People</dt><dd>${emps.length}</dd></div>
+        <div class="r-TL"><dt>Team leads</dt><dd>${leads}</dd></div>
+        ${bad ? `<div class="is-bad"><dt>To fix</dt><dd>${bad}</dd></div>` : ''}
+      </dl>`;
     return `
+      ${viewHead('Step 2 of 3 · Check people', 'Check the people', `${esc(niceDate(state.date))}. Fix any wrong names or times, and tick <b>Team lead</b> for leads. Leads get no job or lunch, and the app remembers them.`, stats)}
       ${noticeHTML()}
-      <div class="card">
-        <div class="row" style="margin-bottom:6px">
-          <h2 style="margin:0">Check the people working ${esc(niceDate(state.date, { weekday: 'long', month: 'short', day: 'numeric' }))}</h2>
-          <span class="spacer"></span>
-          <span class="chip"><span class="n">${emps.length}</span> people</span>
-          <span class="chip r-TL"><span class="dot"></span><span class="n">${leads}</span> team leads</span>
-        </div>
-        <p class="sub">Fix any wrong names or times, and tick <b>Team lead</b> for leads. They won’t get a job or a lunch. Team leads are remembered for next time.</p>
-        <div class="table-wrap review">
-          <table>
-            <thead><tr><th style="width:36px">#</th><th>Name</th><th>Start</th><th>End</th><th>Hours</th><th>Lunch</th><th>Team lead</th><th></th></tr></thead>
+      <section class="panel panel-flush" aria-label="People working this day">
+        <div class="table-wrap">
+          <table class="review">
+            <thead><tr><th class="c-num" scope="col">#</th><th scope="col">Name</th><th scope="col">Start</th><th scope="col">End</th><th scope="col">Hours</th><th scope="col">Lunch</th><th scope="col">Team lead</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
             <tbody>
               ${emps
                 .map((e, i) => {
                   const okTimes = e.start != null && e.end != null && e.end > e.start;
                   const len = okTimes ? Sched.lunchLength(e.start, e.end, settings) : 0;
+                  const label = e.name ? esc(e.name) : `row ${i + 1}`;
                   return `<tr data-id="${e.id}">
-                    <td class="muted">${i + 1}</td>
-                    <td><input type="text" data-f="name" value="${esc(e.name)}" placeholder="Name" class="${e.name ? '' : 'bad-input'}" />${
-                      e.name && dupes.has(Sched.nameKey(e.name)) ? '<div class="small" style="color:var(--warn-ink)">Same name appears more than once</div>' : ''
-                    }${okTimes ? '' : '<div class="small" style="color:var(--bad)">End must be after start</div>'}</td>
-                    <td><input type="time" step="900" data-f="start" value="${T.toInput(e.start)}" class="${okTimes ? '' : 'bad-input'}" /></td>
-                    <td><input type="time" step="900" data-f="end" value="${T.toInput(e.end)}" class="${okTimes ? '' : 'bad-input'}" /></td>
-                    <td class="hrs" data-hrs>${okTimes ? T.hours(e.start, e.end) : '–'}</td>
-                    <td class="hrs" data-len>${e.isTL ? '–' : len ? len + ' min' : 'none'}</td>
-                    <td><input type="checkbox" data-f="isTL" ${e.isTL ? 'checked' : ''} aria-label="Team lead" /></td>
-                    <td><button class="icon-btn" type="button" data-act="rm-emp" aria-label="Remove ${esc(e.name)}">✕</button></td>
+                    <td class="c-num">${i + 1}</td>
+                    <td class="c-name"><input type="text" data-f="name" value="${esc(e.name)}" placeholder="Name" aria-label="Name, row ${i + 1}" autocomplete="off" class="${e.name ? '' : 'bad-input'}" />${
+                      e.name && dupes.has(Sched.nameKey(e.name)) ? `<p class="field-note warn">${icon('alert')}Same name appears more than once</p>` : ''
+                    }${okTimes ? '' : `<p class="field-note bad">${icon('alert')}End must be after start</p>`}</td>
+                    <td class="c-start" data-label="Start"><input type="time" step="900" data-f="start" value="${T.toInput(e.start)}" aria-label="Start time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
+                    <td class="c-end" data-label="End"><input type="time" step="900" data-f="end" value="${T.toInput(e.end)}" aria-label="End time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
+                    <td class="c-hrs num" data-label="Hours" data-hrs>${okTimes ? T.hours(e.start, e.end) : '–'}</td>
+                    <td class="c-len num" data-label="Lunch" data-len>${e.isTL ? '–' : len ? len + ' min' : 'none'}</td>
+                    <td class="c-tl"><label class="check"><input type="checkbox" data-f="isTL" ${e.isTL ? 'checked' : ''} /><span class="check-box">${icon('check')}</span><span class="check-l">Team lead</span></label></td>
+                    <td class="c-rm"><button class="icon-btn danger" type="button" data-act="rm-emp" aria-label="Remove ${label}">${icon('trash')}</button></td>
                   </tr>`;
                 })
                 .join('')}
-              ${emps.length ? '' : '<tr><td colspan="8" class="muted" style="padding:20px;text-align:center">No one yet. Add people below or go back to step 1.</td></tr>'}
             </tbody>
           </table>
+          ${
+            emps.length
+              ? ''
+              : `<div class="empty">${icon('users', 'empty-ic')}<p><b>No one yet.</b> Add a person below, or go back to step 1 to read a schedule.</p></div>`
+          }
         </div>
-        <div class="row" style="margin-top:14px">
-          <button class="btn" type="button" data-act="add-emp">+ Add person</button>
-          <button class="btn" type="button" data-act="sort-emp" ${emps.length > 1 ? '' : 'disabled'}>Sort by start time</button>
-          <button class="btn" type="button" data-act="goto-import">+ Add more screenshots</button>
-          <button class="btn danger ghost" type="button" data-act="clear-emp" ${emps.length ? '' : 'disabled'}>Remove everyone</button>
-          <span class="spacer"></span>
-          ${bad ? `<span class="small" style="color:var(--bad)">${bad} row(s) need a name or valid times</span>` : ''}
-          <button class="btn primary big" type="button" data-act="make" ${emps.length ? '' : 'disabled'}>
-            ${d.rows && d.rows.length ? 'Update jobs & lunches →' : 'Make jobs & lunches →'}
-          </button>
+        <div class="actionbar">
+          <div class="actionbar-tools">
+            <button class="btn" type="button" data-act="add-emp">${icon('plus')}Add person</button>
+            <button class="btn" type="button" data-act="sort-emp" ${emps.length > 1 ? '' : 'disabled'}>${icon('sort')}Sort by start</button>
+            <button class="btn" type="button" data-act="goto-import">${icon('upload')}Add more files</button>
+            <button class="btn ghost danger" type="button" data-act="clear-emp" ${emps.length ? '' : 'disabled'}>${icon('trash')}Remove everyone</button>
+          </div>
+          <div class="actionbar-main">
+            ${bad ? `<span class="hint bad">${bad} row${bad > 1 ? 's' : ''} need a name or valid times</span>` : ''}
+            <button class="btn primary big" type="button" data-act="make" ${emps.length ? '' : 'disabled'}>
+              ${d.rows && d.rows.length ? 'Update jobs &amp; lunches' : 'Make jobs &amp; lunches'}${icon('arrow-right')}
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
       ${
         ocr
-          ? `<details class="card"><summary class="small muted" style="cursor:pointer">What the photo reader saw (for troubleshooting)</summary>
-             <textarea readonly style="margin-top:10px;min-height:220px">${esc(ocr.map((r, i) => `--- screenshot ${i + 1} ---\n` + r.lines.join('\n')).join('\n'))}</textarea></details>`
+          ? `<details class="panel disclosure"><summary>${icon('info')}What the photo reader saw <span class="muted">(for troubleshooting)</span></summary>
+             <textarea readonly aria-label="Text the photo reader saw">${esc(ocr.map((r, i) => `--- screenshot ${i + 1} ---\n` + r.lines.join('\n')).join('\n'))}</textarea></details>`
           : ''
       }`;
   }
@@ -321,7 +393,9 @@
         bits.push(`<span class="note">Covers <b>${roleLabel(s.role)}</b> ${T.range(s.lunch, s.lunch + s.lunchLen)} for ${esc(s.name)}</span>`);
     }
     if (r.lockRole || r.lockLunch || r.coverLock)
-      bits.push(`<button class="lock" type="button" data-act="unlock" title="You changed this. Click to let the app choose again.">🔒 edited</button>`);
+      bits.push(
+        `<button class="lock" type="button" data-act="unlock" title="You changed this. Click to let the app choose again." aria-label="Edited by you. Unlock ${esc(r.name)} so the app can choose again">${icon('lock')}Edited</button>`
+      );
     return bits.join(' ');
   }
 
@@ -383,6 +457,7 @@
     }
 
     let body = '';
+    let rowIndex = 0;
     for (const sec of CHART_SECTIONS) {
       const list = rows
         .filter((r) => sec.roles.includes(r.role))
@@ -412,7 +487,8 @@
           Sched.isSingle(r.role) && hasLunch && r.role !== 'SM'
             ? `<span class="gc-meta">cover: ${cover ? esc(cover.name.split(' ')[0]) : '<b class="bad">none</b>'}</span>`
             : '';
-        body += `<div class="gc-row" data-act="focus" data-id="${r.id}" title="Click to edit ${esc(r.name)}">
+        rowIndex++;
+        body += `<div class="gc-row" data-act="focus" data-id="${r.id}" style="--i:${Math.min(rowIndex, 40)}" role="button" tabindex="0" aria-label="${esc(r.name)}, ${esc(roleLong(r.role))}, ${T.fmt(r.start)} to ${T.fmt(r.end)}${hasLunch ? `, lunch ${T.fmt(r.lunch)}` : ''}. Edit" title="Click to edit ${esc(r.name)}">
           <div class="gc-name"><span class="gc-nm">${esc(r.name)}</span>
             <span class="gc-meta">${r.role === 'SM' ? '<i class="tag r-SM">SM/EXP</i> ' : ''}${T.short(r.start)}–${T.short(r.end)}${sub ? ' · ' : ''}${sub}</span></div>
           <div class="gc-track">
@@ -440,15 +516,15 @@
   }
 
   function chartLegend() {
-    return `<div class="legend gc-legend">
+    return `<ul class="legend gc-legend" aria-label="Legend">
       ${['PICK', 'SM', 'DISP', 'BR', 'PREP', 'TL']
         .filter((k) => k === 'PICK' || k === 'DISP' || k === 'TL' || enabledSingles().includes(k))
-        .map((k) => `<span><i class="sw r-${k}" style="background:var(--c)"></i>${esc(roleLong(k))}</span>`)
+        .map((k) => `<li><i class="sw r-${k}"></i>${esc(roleLong(k))}</li>`)
         .join('')}
-      <span><i class="sw" style="background:var(--lunchc);border:1px solid var(--lunch-ink)"></i>Lunch</span>
-      <span><i class="sw" style="background:#fff;border:2px dashed var(--ink)"></i>Covering a lunch</span>
-      <span><i class="sw" style="background:var(--lunchc)"></i><b>2</b> = people from that team at lunch</span>
-    </div>`;
+      <li><i class="sw sw-lunch"></i>Lunch</li>
+      <li><i class="sw sw-cover"></i>Covering a lunch</li>
+      <li><i class="sw sw-count">2</i>Team members at lunch</li>
+    </ul>`;
   }
 
   function viewChart(rows, byId) {
@@ -456,51 +532,54 @@
     const starts = [...new Set(withLunch.map((r) => r.lunch))].sort((a, b) => a - b);
     const order = { SM: 0, PICK: 1, DISP: 2, BR: 3, PREP: 4 };
     return `
-      <div class="card">
-        <div class="row" style="margin-bottom:4px">
-          <h2 style="margin:0">Lunch chart</h2>
-          <span class="spacer"></span>
-          <button class="btn small" type="button" data-act="print-chart">🖨 Print chart</button>
+      <section class="panel" id="panel-chart" role="tabpanel" aria-labelledby="tab-chart">
+        <div class="panel-head">
+          <div><h2>Lunch chart</h2>
+          <p class="panel-sub">Each bar is a shift; the yellow block is lunch. Select anyone to change their job or lunch.</p></div>
+          <button class="btn small" type="button" data-act="print-chart">${icon('print')}Print chart</button>
         </div>
-        <p class="sub">Each bar is a shift, the yellow block is lunch. Click anyone to change their job or lunch.</p>
         ${chartLegend()}
-        <div class="gc-wrap">${chartGrid(rows, byId)}</div>
-      </div>
-      <div class="card">
-        <h2>Lunch order</h2>
-        <p class="sub">Who goes to lunch when. Colors show their job.</p>
-        <div class="lo-list">
+        <div class="gc-wrap" tabindex="0" role="region" aria-label="Lunch chart, scrolls sideways">${chartGrid(rows, byId)}</div>
+      </section>
+      <section class="panel" aria-labelledby="loTitle">
+        <div class="panel-head">
+          <div><h2 id="loTitle">Lunch order</h2>
+          <p class="panel-sub">Who goes to lunch when. Colors show their job.</p></div>
+        </div>
+        <ol class="lo-list">
           ${
             starts.length
               ? starts
                   .map((t) => {
                     const ppl = withLunch.filter((r) => r.lunch === t).sort((a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name));
-                    return `<div class="lo-row"><div class="lo-time">${T.fmt(t)}</div><div class="lo-names">${ppl
+                    return `<li class="lo-row"><time class="lo-time">${T.fmt(t)}</time><div class="lo-names">${ppl
                       .map(
                         (r) =>
-                          `<span class="chip r-${r.role}" title="${esc(roleLong(r.role))}"><span class="dot"></span>${esc(r.name)} <small>${
+                          `<span class="chip r-${r.role}" title="${esc(roleLong(r.role))}"><span class="dot" aria-hidden="true"></span>${esc(r.name)}<small>${
                             r.lunchLen >= 60 ? r.lunchLen / 60 + 'h' : r.lunchLen + 'm'
-                          }</small></span>`
+                          }</small><span class="sr-only">, ${esc(roleLong(r.role))}</span></span>`
                       )
-                      .join('')}</div></div>`;
+                      .join('')}</div></li>`;
                   })
                   .join('')
-              : '<p class="muted">No lunches today.</p>'
+              : '<li class="muted">No lunches today.</li>'
           }
-        </div>
-      </div>`;
+        </ol>
+      </section>`;
   }
 
   function viewTabs() {
     const tabs = [
-      ['chart', '📊 Lunch chart'],
-      ['table', '✏️ Edit jobs & lunches'],
-      ['floor', '👥 Who’s on the floor'],
+      ['chart', 'gantt', 'Lunch chart', 'Chart'],
+      ['table', 'pen', 'Edit jobs & lunches', 'Edit'],
+      ['floor', 'users', 'Who’s on the floor', 'Floor'],
     ];
-    return `<div class="tabs" role="tablist">${tabs
+    return `<div class="tabs" role="tablist" aria-label="Schedule views">${tabs
       .map(
-        ([v, l]) =>
-          `<button type="button" role="tab" aria-selected="${state.view === v}" class="${state.view === v ? 'active' : ''}" data-act="view" data-v="${v}">${l}</button>`
+        ([v, ic, l, s]) =>
+          `<button type="button" role="tab" id="tab-${v}" aria-controls="panel-${v}" aria-selected="${state.view === v}" tabindex="${state.view === v ? 0 : -1}" class="${
+            state.view === v ? 'active' : ''
+          }" data-act="view" data-v="${v}">${icon(ic)}<span class="tab-l">${esc(l)}</span><span class="tab-s" aria-hidden="true">${esc(s)}</span></button>`
       )
       .join('')}</div>`;
   }
@@ -517,83 +596,90 @@
     const fmtW = (w) => esc(w.text) + (w.from != null ? ` <b>${T.short(w.from)}–${T.short(w.to)}</b>` : '');
 
     const covRow = (label, cls, get, lowFn) =>
-      `<tr><td>${label}</td>${a.slots
+      `<tr><th scope="row">${label}</th>${a.slots
         .map((s) => {
           const v = get(s);
           const low = lowFn && lowFn(s, v);
-          return `<td class="${low ? 'lo' : ''} ${cls || ''}">${v}</td>`;
+          return `<td class="${low ? 'lo' : ''} ${cls || ''}"${low ? ` title="Short at ${T.fmt(s.t)}"` : ''}>${v}</td>`;
         })
         .join('')}</tr>`;
     const inDisp = (t) => t >= settings.dispFrom && t < settings.dispTo;
 
+    const issues = a.warnings.length;
+    const kpi = (k, n, label, extra) =>
+      `<div class="kpi ${k ? 'r-' + k : ''} ${extra || ''}"><span class="kpi-n">${n}</span><span class="kpi-l">${label}</span></div>`;
+    const headAside = `
+      <button class="btn" type="button" data-act="goto-review">${icon('users')}<span>Edit people</span></button>
+      <button class="btn" type="button" data-act="print">${icon('print')}<span>Print</span></button>
+      <button class="btn" type="button" data-act="csv">${icon('download')}<span>CSV</span></button>`;
     return `
+      ${viewHead('Step 3 of 3 · Jobs &amp; lunches', esc(niceDate(state.date)), `${rows.length} people on the schedule. ${
+        edited ? 'Your edits stay locked when you redo.' : 'Change any job or lunch; covers and warnings update right away.'
+      }`, `<div class="head-tools">${headAside}</div>`)}
       ${noticeHTML()}
-      <div class="card">
-        <div class="row" style="margin-bottom:12px">
-          <h2 style="margin:0">${esc(niceDate(state.date))}</h2>
-          <span class="muted small">${edited ? 'Your edits are kept (🔒) when you redo.' : 'Change any job or lunch below; covers and warnings update right away.'}</span>
-        </div>
-        <div class="toolbar">
-          <button class="btn primary" type="button" data-act="redo" title="Re-plan everything you haven't changed by hand">↻ Redo schedule</button>
-          <button class="btn" type="button" data-act="mix" title="Try a different mix of people and jobs">🔀 Try another mix</button>
-          ${edited ? '<button class="btn" type="button" data-act="unlock-all">Undo my edits</button>' : ''}
-          <span class="spacer"></span>
-          <button class="btn" type="button" data-act="goto-review">Edit people</button>
-          <button class="btn" type="button" data-act="print">🖨 Print</button>
-          <button class="btn" type="button" data-act="csv">Download CSV</button>
-        </div>
-        <div class="chips">
-          ${order
-            .filter((k) => a.counts[k])
-            .map((k) => `<span class="chip r-${k}"><span class="dot"></span>${esc(roleLong(k))}<span class="n">${a.counts[k]}</span></span>`)
-            .join('')}
-          <span class="chip">Lunches <span class="n">${lunches}</span></span>
-        </div>
-        ${
-          a.warnings.length
-            ? `<div class="alerts warn"><b>${a.warnings.length} thing${a.warnings.length > 1 ? 's' : ''} to check</b><ul>${a.warnings
-                .map((w) => `<li>${fmtW(w)}</li>`)
-                .join('')}</ul></div>`
-            : '<div class="alerts ok">✓ Every job is covered, lunches follow the rules, and every one-person job has a lunch cover.</div>'
-        }
-        ${viewTabs()}
+      <div class="kpis" aria-label="Today at a glance">
+        ${order.filter((k) => a.counts[k]).map((k) => kpi(k, a.counts[k], PLURAL[k] || esc(roleLong(k)))).join('')}
+        ${kpi('', lunches, 'Lunches', 'kpi-lunch')}
+        ${kpi('', issues || icon('check'), issues ? `To check` : 'All clear', issues ? 'kpi-warn' : 'kpi-ok')}
       </div>
+
+      <section class="plan ${issues ? 'warn' : 'ok'}" aria-label="Schedule status">
+        <div class="plan-status">
+          ${icon(issues ? 'alert' : 'check-circle', 'plan-ic')}
+          <div>
+            <p class="plan-title">${issues ? `${issues} thing${issues > 1 ? 's' : ''} to check` : 'Everything checks out'}</p>
+            <p class="plan-sub">${
+              issues ? 'The app couldn’t fix these on its own. Adjust below, or try another mix.' : 'Every job is covered, lunches follow the rules, and every one-person job has a lunch cover.'
+            }</p>
+          </div>
+        </div>
+        <div class="plan-actions">
+          ${edited ? `<button class="btn ghost" type="button" data-act="unlock-all">${icon('undo')}Undo my edits</button>` : ''}
+          <button class="btn" type="button" data-act="mix" title="Try a different mix of people and jobs">${icon('shuffle')}Try another mix</button>
+          <button class="btn primary" type="button" data-act="redo" title="Re-plan everything you haven't changed by hand">${icon('refresh')}Redo schedule</button>
+        </div>
+        ${issues ? `<ul class="issues">${a.warnings.map((w) => `<li>${fmtW(w)}</li>`).join('')}</ul>` : ''}
+      </section>
+
+      ${viewTabs()}
       ${state.view === 'chart' ? viewChart(rows, byId) : ''}
-      <div class="card" ${state.view === 'table' ? '' : 'hidden'}>
+      <section class="panel panel-flush" id="panel-table" role="tabpanel" aria-labelledby="tab-table" ${state.view === 'table' ? '' : 'hidden'}>
         <div class="table-wrap">
           <table class="sched">
-            <thead><tr><th>Name</th><th>Shift</th><th>Hrs</th><th>Job</th><th>Lunch</th><th class="tl-headcell tl-cell">${timelineHead()}</th><th>Notes</th></tr></thead>
+            <thead><tr><th scope="col">Name</th><th scope="col">Shift</th><th scope="col">Hrs</th><th scope="col">Job</th><th scope="col">Lunch</th><th class="tl-headcell tl-cell" scope="col"><span class="sr-only">Timeline</span>${timelineHead()}</th><th scope="col">Notes</th></tr></thead>
             <tbody>
               ${rows
                 .map(
-                  (r) => `<tr data-id="${r.id}" class="${r.isTL ? 'tl' : ''}">
-                    <td class="name">${esc(r.name)}</td>
-                    <td class="shift">${T.short(r.start)}–${T.short(r.end)}</td>
-                    <td class="shift muted">${T.hours(r.start, r.end)}</td>
-                    <td>${roleSelect(r)}</td>
-                    <td>${lunchSelect(r)}</td>
+                  (r) => `<tr data-id="${r.id}" class="r-${r.role}${r.isTL ? ' tl' : ''}">
+                    <th scope="row" class="name">${esc(r.name)}</th>
+                    <td class="shift num" data-label="Shift">${T.short(r.start)}–${T.short(r.end)}</td>
+                    <td class="hrs num" data-label="Hours">${T.hours(r.start, r.end)}</td>
+                    <td class="c-job" data-label="Job">${roleSelect(r)}</td>
+                    <td class="c-lunch" data-label="Lunch">${lunchSelect(r)}</td>
                     <td class="tl-cell">${timeline(r, rows)}</td>
-                    <td>${notesCell(r, rows, byId)}</td>
+                    <td class="c-notes">${notesCell(r, rows, byId)}</td>
                   </tr>`
                 )
                 .join('')}
             </tbody>
           </table>
         </div>
-        <div class="legend">
-          ${['PICK', 'DISP', ...enabledSingles()].map((k) => `<span><i class="sw r-${k}" style="background:var(--c)"></i>${esc(roleLong(k))}</span>`).join('')}
-          <span><i class="sw" style="background:repeating-linear-gradient(45deg,#fff,#fff 3px,var(--lunch) 3px,var(--lunch) 5px);border:1px solid var(--lunch)"></i>Lunch</span>
-          <span><i class="sw" style="border:2px solid var(--ink)"></i>Covering a lunch</span>
-          <span>⚠ = lunch time outside the rules</span>
-        </div>
-      </div>
+        <ul class="legend legend-pad" aria-label="Legend">
+          ${['PICK', 'DISP', ...enabledSingles()].map((k) => `<li><i class="sw r-${k}"></i>${esc(roleLong(k))}</li>`).join('')}
+          <li><i class="sw sw-lunch"></i>Lunch</li>
+          <li><i class="sw sw-cover"></i>Covering a lunch</li>
+          <li><span class="warn-mark" aria-hidden="true">⚠</span>Lunch time outside the rules</li>
+        </ul>
+      </section>
 
-      <div class="card" ${state.view === 'floor' ? '' : 'hidden'}>
-        <h2>Who’s on the floor</h2>
-        <p class="sub">Every half hour: people actually working each job (not at lunch). Red means short.</p>
-        <div class="table-wrap">
+      <section class="panel" id="panel-floor" role="tabpanel" aria-labelledby="tab-floor" ${state.view === 'floor' ? '' : 'hidden'}>
+        <div class="panel-head">
+          <div><h2>Who’s on the floor</h2>
+          <p class="panel-sub">Every half hour: people actually working each job, not at lunch. Red means short.</p></div>
+        </div>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Floor coverage by half hour, scrolls sideways">
           <table class="coverage">
-            <thead><tr><th>Time</th>${a.slots.map((s) => `<th>${T.short(s.t)}</th>`).join('')}</tr></thead>
+            <thead><tr><th scope="col">Time</th>${a.slots.map((s) => `<th scope="col">${T.short(s.t)}</th>`).join('')}</tr></thead>
             <tbody>
               ${covRow('Pickers', '', (s) => s.PICK, (s, v) => s.staff > 0 && v < settings.minPick)}
               ${covRow('Dispensers', '', (s) => s.DISP, (s, v) => s.staff > 0 && inDisp(s.t) && v < settings.minDisp)}
@@ -611,7 +697,7 @@
             </tbody>
           </table>
         </div>
-      </div>`;
+      </section>`;
   }
 
   // ------------------------------------------------------------------ print / csv
@@ -724,10 +810,15 @@
     for (let i = 0; i < n; i++) {
       const f = files[i];
       const progress = (frac, label) => {
+        // loading/preparing report their own 0–1 progress; only real reading moves the bar
+        if (/^(Loading|Preparing)/.test(label)) frac = 0;
         state.progress = { i, f: frac, label };
         const bar = $('#progBar');
         const lab = $('#progLabel');
-        if (bar) bar.style.width = Math.round(((i + Math.min(1, frac || 0)) / n) * 100) + '%';
+        const pc = $('#progPct');
+        const p = Math.round(((i + Math.min(1, frac || 0)) / n) * 100);
+        if (bar) bar.style.width = p + '%';
+        if (pc) pc.textContent = p + '%';
         if (lab) lab.textContent = `${label} file ${i + 1} of ${n}…`;
       };
       try {
@@ -904,6 +995,25 @@
     if (ev.target.id === 'drop' && (ev.key === 'Enter' || ev.key === ' ')) {
       ev.preventDefault();
       $('#fileIn').click();
+      return;
+    }
+    // chart rows act like buttons
+    if (ev.target.classList.contains('gc-row') && (ev.key === 'Enter' || ev.key === ' ')) {
+      ev.preventDefault();
+      ev.target.click();
+      return;
+    }
+    // tabs: arrow keys move between views
+    const tab = ev.target.closest('[role="tab"]');
+    if (tab && (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft' || ev.key === 'Home' || ev.key === 'End')) {
+      ev.preventDefault();
+      const all = [...tab.parentElement.querySelectorAll('[role="tab"]')];
+      const i = all.indexOf(tab);
+      const next =
+        ev.key === 'Home' ? 0 : ev.key === 'End' ? all.length - 1 : (i + (ev.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
+      state.view = all[next].dataset.v;
+      render();
+      $(`#tab-${state.view}`)?.focus();
     }
   });
 
@@ -1009,25 +1119,66 @@
   });
 
   // ------------------------------------------------------------------ header
-  $('#date').addEventListener('change', (ev) => {
-    if (!ev.target.value) return;
-    state.date = ev.target.value;
+  function goToDate(iso) {
+    if (!iso || iso === state.date) return;
+    state.date = iso;
     state.step = defaultStep();
     state.lastOcr = null;
     render();
-  });
+  }
+  $('#date').addEventListener('change', (ev) => goToDate(ev.target.value));
+  $('#dayPrev').addEventListener('click', () => goToDate(addDays(state.date, -1)));
+  $('#dayNext').addEventListener('click', () => goToDate(addDays(state.date, 1)));
+  $('#dayToday').addEventListener('click', () => goToDate(todayISO()));
   document.querySelectorAll('#steps button').forEach((b) => b.addEventListener('click', () => setStep(b.dataset.step)));
 
   // ------------------------------------------------------------------ settings dialog
   const setDlg = $('#settingsDlg');
   $('#btnSettings').addEventListener('click', () => openSettings(settings));
 
-  function openSettings(s) {
+  // ---- theme preference (per device): 'light' (default) | 'dark' | 'auto' (match device)
+  const THEME_KEY = 'opd-schedule-maker:theme';
+  const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function loadTheme() {
+    try {
+      const t = localStorage.getItem(THEME_KEY);
+      return t === 'dark' || t === 'auto' ? t : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+  function applyTheme(pref) {
+    const dark = pref === 'dark' || (pref === 'auto' && darkQuery && darkQuery.matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }
+  function saveTheme(pref) {
+    try {
+      localStorage.setItem(THEME_KEY, pref);
+    } catch (e) {
+      /* private mode: the choice just won't be remembered */
+    }
+  }
+  applyTheme(loadTheme());
+  if (darkQuery) {
+    const onDeviceTheme = () => loadTheme() === 'auto' && applyTheme('auto');
+    if (darkQuery.addEventListener) darkQuery.addEventListener('change', onDeviceTheme);
+    else if (darkQuery.addListener) darkQuery.addListener(onDeviceTheme);
+  }
+  // preview a theme while the dialog is open; closing without Save puts the saved one back
+  setDlg.addEventListener('change', (ev) => {
+    if (ev.target.name === 'theme') applyTheme(ev.target.value);
+  });
+  setDlg.addEventListener('close', () => applyTheme(loadTheme()));
+
+  function openSettings(s, theme) {
     const L = s.lunch;
+    const th = theme || loadTheme();
+    const themeOpt = (v, ic, label) =>
+      `<label><input type="radio" name="theme" value="${v}" ${th === v ? 'checked' : ''} /><span>${icon(ic)}${label}</span></label>`;
     const num = (name, v, step) => `<input type="number" name="${name}" value="${v}" step="${step || 0.5}" min="0" />`;
     const time = (name, v) => `<input type="time" step="900" name="${name}" value="${T.toInput(v)}" />`;
     setDlg.innerHTML = `
-      <header><h3>Settings</h3><button class="icon-btn" type="button" data-dlg="close" aria-label="Close">✕</button></header>
+      <header><div><p class="eyebrow">Your store</p><h3 id="settingsTitle">Settings</h3></div><button class="icon-btn" type="button" data-dlg="close" aria-label="Close settings">${icon('x')}</button></header>
       <form class="body" id="setForm" onsubmit="return false">
         <fieldset><legend>Department hours</legend>
           <div class="form-line"><label>Opens ${time('deptStart', s.deptStart)}</label><label>Closes ${time('deptEnd', s.deptEnd)}</label></div>
@@ -1071,6 +1222,17 @@
           </div>
           <p class="muted small" style="margin:4px 0 0">Uses the days saved in this browser, so people don’t get the same job every day.</p>
         </fieldset>
+        <fieldset class="prefs"><legend>Preferences</legend>
+          <div class="form-line pref-line">
+            <span class="pref-label" id="themeLabel">Appearance</span>
+            <div class="seg" role="radiogroup" aria-labelledby="themeLabel">
+              ${themeOpt('light', 'sun', 'Light')}
+              ${themeOpt('dark', 'moon', 'Dark')}
+              ${themeOpt('auto', 'monitor', 'Match device')}
+            </div>
+          </div>
+          <p class="muted small" style="margin:4px 0 0">Light is the default. This choice is saved on this device only.</p>
+        </fieldset>
       </form>
       <footer>
         <button class="btn ghost" type="button" data-dlg="defaults">Reset to defaults</button>
@@ -1085,9 +1247,14 @@
     const b = ev.target.closest('[data-dlg]');
     if (!b) return;
     if (b.dataset.dlg === 'close') return setDlg.close();
-    if (b.dataset.dlg === 'defaults') return openSettings(Sched.defaultSettings());
+    if (b.dataset.dlg === 'defaults') {
+      applyTheme('light');
+      return openSettings(Sched.defaultSettings(), 'light');
+    }
     if (b.dataset.dlg === 'save') {
       const f = new FormData($('#setForm'));
+      const theme = f.get('theme');
+      if (theme === 'light' || theme === 'dark' || theme === 'auto') saveTheme(theme);
       // a box left blank (or typed as junk) keeps its current value instead of becoming 0
       const n = (k, prev) => {
         const v = f.get(k);
@@ -1152,31 +1319,33 @@
       .filter((d) => d && d.employees && d.employees.length)
       .sort((a, b) => b.date.localeCompare(a.date));
     histDlg.innerHTML = `
-      <header><h3>Saved days</h3><button class="icon-btn" type="button" data-h="close" aria-label="Close">✕</button></header>
+      <header><div><p class="eyebrow">This browser</p><h3 id="historyTitle">Saved days</h3></div><button class="icon-btn" type="button" data-h="close" aria-label="Close saved days">${icon('x')}</button></header>
       <div class="body">
-        <p class="muted small" style="margin-top:0">Everything saves automatically in this browser. Saved schedules are also used to rotate jobs.</p>
+        <p class="dlg-intro">Everything saves automatically in this browser. Saved schedules are also used to rotate jobs.</p>
         ${
           days.length
-            ? days
-                .map(
-                  (d) => `<div class="hist-item">
-                    <span class="when">${esc(niceDate(d.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }))}</span>
-                    <span class="muted small">${d.employees.length} people · ${d.rows && d.rows.length ? 'schedule made' : 'not scheduled yet'}</span>
+            ? `<ul class="hist">${days
+                .map((d) => {
+                  const made = d.rows && d.rows.length;
+                  return `<li class="hist-item${d.date === state.date ? ' current' : ''}">
+                    <span class="hist-date"><b>${esc(niceDate(d.date, { day: 'numeric' }))}</b><small>${esc(niceDate(d.date, { month: 'short' }))}</small></span>
+                    <span class="hist-main"><span class="when">${esc(niceDate(d.date, { weekday: 'long', year: 'numeric' }))}</span>
+                    <span class="hist-meta">${d.employees.length} people · <span class="pill ${made ? 'ok' : ''}">${made ? 'Scheduled' : 'Not scheduled'}</span></span></span>
                     <button class="btn small" type="button" data-h="open" data-date="${d.date}">Open</button>
-                    <button class="icon-btn" type="button" data-h="del" data-date="${d.date}" aria-label="Delete">✕</button>
-                  </div>`
-                )
-                .join('')
-            : '<p class="muted">Nothing saved yet.</p>'
+                    <button class="icon-btn danger" type="button" data-h="del" data-date="${d.date}" aria-label="Delete ${esc(niceDate(d.date))}">${icon('trash')}</button>
+                  </li>`;
+                })
+                .join('')}</ul>`
+            : `<div class="empty">${icon('archive', 'empty-ic')}<p><b>Nothing saved yet.</b> Days appear here once you add people.</p></div>`
         }
-        <fieldset style="margin-top:18px"><legend>Backup</legend>
-          <p class="muted small" style="margin:0 0 8px">Data lives in this browser only. Download a backup to move it to another computer or keep it safe.</p>
+        <fieldset class="backup"><legend>Backup</legend>
+          <p class="dlg-intro">Data lives in this browser only. Download a backup to move it to another computer or keep it safe.</p>
           <div class="row">
-            <button class="btn" type="button" data-h="export">Download backup</button>
-            <button class="btn" type="button" data-h="import">Restore from backup…</button>
+            <button class="btn" type="button" data-h="export">${icon('download')}Download backup</button>
+            <button class="btn" type="button" data-h="import">${icon('upload')}Restore from backup…</button>
             <input type="file" id="backupIn" accept="application/json,.json" hidden />
             <span class="spacer"></span>
-            <button class="btn danger ghost" type="button" data-h="wipe">Erase everything</button>
+            <button class="btn ghost danger" type="button" data-h="wipe">${icon('trash')}Erase everything</button>
           </div>
         </fieldset>
       </div>`;

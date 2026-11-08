@@ -64,3 +64,4 @@ it to another computer. (A shared online database is the next step for multi-dev
 - `js/pdf.js`: PDF reading (PDF.js); scanned pages go to the photo reader
 - `js/sheet.js`: Excel / CSV reading (SheetJS)
 - `js/app.js`: the website screens
+- `css/styles.css` + `fonts/`: the look; see [DESIGN.md](DESIGN.md) for the design system

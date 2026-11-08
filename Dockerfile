@@ -6,6 +6,7 @@ WORKDIR /src
 COPY index.html favicon-ogp-48x48.png ./
 COPY css ./css
 COPY js ./js
+COPY fonts ./fonts
 COPY deploy/build-site.sh ./deploy/build-site.sh
 RUN sh deploy/build-site.sh /site
 
