@@ -2,7 +2,7 @@
 
 A free website for OPD team leads: add the day's schedule (screenshots, PDF, Excel/CSV, or typed), and it
 assigns every associate a job (Pick, Disp, Backroom, Prep, SM/EXP) and a staggered lunch,
-with a named cover for each Backroom / Prep / SM lunch. Everything stays editable.
+with a named cover for each Backroom / Prep lunch. Everything stays editable.
 
 ## Run it
 

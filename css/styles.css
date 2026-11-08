@@ -1395,7 +1395,7 @@ thead th {
   color: var(--ink-3);
   white-space: nowrap;
 }
-tbody tr:last-child > * {
+.table-wrap tbody tr:last-child > * {
   border-bottom: 0;
 }
 

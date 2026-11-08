@@ -303,8 +303,8 @@
                     <td class="c-name"><input type="text" data-f="name" value="${esc(e.name)}" placeholder="Name" aria-label="Name, row ${i + 1}" autocomplete="off" class="${e.name ? '' : 'bad-input'}" />${
                       e.name && dupes.has(Sched.nameKey(e.name)) ? `<p class="field-note warn">${icon('alert')}Same name appears more than once</p>` : ''
                     }${okTimes ? '' : `<p class="field-note bad">${icon('alert')}End must be after start</p>`}</td>
-                    <td class="c-start" data-label="Start"><input type="time" step="900" data-f="start" value="${T.toInput(e.start)}" aria-label="Start time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
-                    <td class="c-end" data-label="End"><input type="time" step="900" data-f="end" value="${T.toInput(e.end)}" aria-label="End time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
+                    <td class="c-start" data-label="Start"><input type="time" step="1800" data-f="start" value="${T.toInput(e.start)}" aria-label="Start time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
+                    <td class="c-end" data-label="End"><input type="time" step="1800" data-f="end" value="${T.toInput(e.end)}" aria-label="End time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
                     <td class="c-hrs num" data-label="Hours" data-hrs>${okTimes ? T.hours(e.start, e.end) : '–'}</td>
                     <td class="c-len num" data-label="Lunch" data-len>${e.isTL ? '–' : len ? len + ' min' : 'none'}</td>
                     <td class="c-tl"><label class="check"><input type="checkbox" data-f="isTL" ${e.isTL ? 'checked' : ''} /><span class="check-box">${icon('check')}</span><span class="check-l">Team lead</span></label></td>
@@ -374,7 +374,7 @@
   function notesCell(r, rows, byId) {
     const bits = [];
     if (r.isTL) bits.push('<span class="note">Runs the department</span>');
-    if (Sched.isSingle(r.role) && r.lunch != null && r.lunchLen) {
+    if (Sched.needsCover(r.role) && r.lunch != null && r.lunchLen) {
       const a = r.lunch;
       const b = r.lunch + r.lunchLen;
       const cands = rows.filter(
@@ -389,7 +389,7 @@
       );
     }
     for (const s of rows) {
-      if (s.coverBy === r.id && Sched.isSingle(s.role) && s.lunch != null)
+      if (s.coverBy === r.id && Sched.needsCover(s.role) && s.lunch != null)
         bits.push(`<span class="note">Covers <b>${roleLabel(s.role)}</b> ${T.range(s.lunch, s.lunch + s.lunchLen)} for ${esc(s.name)}</span>`);
     }
     if (r.lockRole || r.lockLunch || r.coverLock)
@@ -409,7 +409,7 @@
     if (r.lunch != null && r.lunchLen)
       html += `<div class="lunch" style="left:${pct(r.lunch)}%;width:${pct(r.lunch + r.lunchLen) - pct(r.lunch)}%" title="Lunch"></div>`;
     for (const s of rows)
-      if (s.coverBy === r.id && Sched.isSingle(s.role) && s.lunch != null)
+      if (s.coverBy === r.id && Sched.needsCover(s.role) && s.lunch != null)
         html += `<div class="cov r-${s.role}" style="left:${pct(s.lunch)}%;width:${pct(s.lunch + s.lunchLen) - pct(s.lunch)}%" title="Covering ${roleLong(
           s.role
         )}"></div>`;
@@ -440,7 +440,7 @@
     const span = E0 - S0;
     const pct = (m) => (Math.max(0, Math.min(span, m - S0)) / span) * 100;
     const box = (a, b) => `left:${pct(a)}%;width:${pct(b) - pct(a)}%`;
-    const coversBy = (id) => rows.filter((s) => s.coverBy === id && Sched.isSingle(s.role) && s.lunch != null && s.lunchLen);
+    const coversBy = (id) => rows.filter((s) => s.coverBy === id && Sched.needsCover(s.role) && s.lunch != null && s.lunchLen);
 
     let hours = '';
     for (let t = Math.ceil(S0 / 60) * 60; t <= E0; t += 60) {
@@ -486,7 +486,7 @@
         const cover = r.coverBy && byId.has(r.coverBy) ? byId.get(r.coverBy) : null;
         const hasLunch = r.lunch != null && r.lunchLen;
         const sub =
-          Sched.isSingle(r.role) && hasLunch && r.role !== 'SM'
+          Sched.needsCover(r.role) && hasLunch && r.role !== 'SM'
             ? `<span class="gc-meta">cover: ${cover ? esc(cover.name.split(' ')[0]) : '<b class="bad">none</b>'}</span>`
             : '';
         rowIndex++;
@@ -706,9 +706,9 @@
   // ------------------------------------------------------------------ print / csv
   function rowNotes(r, rows, byId) {
     const n = [];
-    if (Sched.isSingle(r.role) && r.lunch != null && r.coverBy && byId.has(r.coverBy)) n.push('Cover: ' + byId.get(r.coverBy).name);
+    if (Sched.needsCover(r.role) && r.lunch != null && r.coverBy && byId.has(r.coverBy)) n.push('Cover: ' + byId.get(r.coverBy).name);
     for (const s of rows)
-      if (s.coverBy === r.id && Sched.isSingle(s.role) && s.lunch != null) n.push(`${roleLabel(s.role)} ${T.range(s.lunch, s.lunch + s.lunchLen)}`);
+      if (s.coverBy === r.id && Sched.needsCover(s.role) && s.lunch != null) n.push(`${roleLabel(s.role)} ${T.range(s.lunch, s.lunch + s.lunchLen)}`);
     return n.join('; ');
   }
   // Printouts list people by start hour, then whoever leaves first (shortest shift on top).
@@ -732,8 +732,10 @@
     const box = (a, b) => `left:${pct(a)}%;width:${pct(b) - pct(a)}%`;
     const hours = [];
     for (let t = Math.floor(S0 / 60) * 60; t < E0; t += 60) hours.push(t);
+    // dispensing opens later than the department (people who start earlier pick until then)
+    const dispHours = hours.filter((t) => t >= Math.floor(settings.dispOpen / 60) * 60);
     const hasLunch = (r) => r.lunch != null && r.lunchLen;
-    const coversBy = (id) => rows.filter((x) => x.coverBy === id && Sched.isSingle(x.role) && hasLunch(x));
+    const coversBy = (id) => rows.filter((x) => x.coverBy === id && Sched.needsCover(x.role) && hasLunch(x));
     const lunchCell = (r) => (hasLunch(r) ? T.range(r.lunch, r.lunch + r.lunchLen) : '<span class="fs-none">none</span>');
     const tag = (r) => (r.role === 'SM' ? ' <i class="fs-tag">SM/EXP</i>' : r.role === 'BR' ? ' <i class="fs-tag">BR</i>' : r.role === 'PREP' ? ' <i class="fs-tag">PR</i>' : '');
     const scale = hours
@@ -749,7 +751,7 @@
           <thead><tr><th class="fs-n">Name</th><th class="fs-s">Shift</th><th class="fs-l">Lunch</th><th class="fs-tl"><div class="fs-scale">${scale}</div></th></tr></thead>
           <tbody>${list
             .map((r) => {
-              const cover = Sched.isSingle(r.role) && r.role !== 'SM' && hasLunch(r) ? (r.coverBy && byId.has(r.coverBy) ? byId.get(r.coverBy).name : null) : undefined;
+              const cover = Sched.needsCover(r.role) && r.role !== 'SM' && hasLunch(r) ? (r.coverBy && byId.has(r.coverBy) ? byId.get(r.coverBy).name : null) : undefined;
               return `<tr>
                 <td class="fs-n"><b>${esc(r.name)}</b>${tag(r)}${cover !== undefined ? `<div class="fs-sub">Lunch cover: ${cover ? esc(cover) : '<b>none</b>'}</div>` : ''}</td>
                 <td class="fs-s">${T.short(r.start)}–${T.short(r.end)}</td>
@@ -785,10 +787,10 @@
       ? `<section class="fs-sec">
         <h2>Dispensers <small>by hour · ${disp.length} ${disp.length === 1 ? 'person' : 'people'}</small></h2>
         <table class="fs-table fs-grid">
-          <thead><tr><th class="fs-n">Name</th><th class="fs-s">Shift</th><th class="fs-l">Lunch</th>${hours.map((h) => `<th class="fs-h">${T.short(h)}</th>`).join('')}</tr></thead>
+          <thead><tr><th class="fs-n">Name</th><th class="fs-s">Shift</th><th class="fs-l">Lunch</th>${dispHours.map((h) => `<th class="fs-h">${T.short(h)}</th>`).join('')}</tr></thead>
           <tbody>${disp
             .map(
-              (r) => `<tr><td class="fs-n"><b>${esc(r.name)}</b></td><td class="fs-s">${T.short(r.start)}–${T.short(r.end)}</td><td class="fs-l">${lunchCell(r)}</td>${hours
+              (r) => `<tr><td class="fs-n"><b>${esc(r.name)}</b></td><td class="fs-s">${T.short(r.start)}–${T.short(r.end)}</td><td class="fs-l">${lunchCell(r)}</td>${dispHours
                 .map((h) => {
                   const i = hourInfo(r, h);
                   if (i.lunch > 0) return '<td class="fs-h fs-lunchc">L</td>';
@@ -807,10 +809,10 @@
 
     const roster = disp.length
       ? `<section class="fs-sec">
-        <h2>Dispensing each hour <small>who is loading cars, hour by hour</small></h2>
+        <h2>Dispensing each hour <small>who is loading cars, from ${T.fmt(dispHours[0] != null ? dispHours[0] : S0)}</small></h2>
         <table class="fs-table fs-roster">
           <thead><tr><th class="fs-hr">Hour</th><th class="fs-ct">#</th><th>Dispensing</th></tr></thead>
-          <tbody>${hours
+          <tbody>${dispHours
             .map((h) => {
               const people = disp
                 .map((r) => ({ r, i: hourInfo(r, h) }))
@@ -818,6 +820,7 @@
                 .map(({ r, i }) => {
                   const notes = [];
                   if (r.start > h && r.start < h + 60) notes.push('from ' + T.short(r.start));
+                  if (h === dispHours[0] && r.start < h) notes.push('picks until ' + T.short(h));
                   if (r.end > h && r.end < h + 60) notes.push('until ' + T.short(r.end));
                   if (i.lunch > 0) notes.push(r.lunch > h ? 'lunch ' + T.short(r.lunch) : 'back ' + T.short(r.lunch + r.lunchLen));
                   i.cov.forEach((x) => notes.push(`covers ${short(x.role)} ${T.short(x.lunch)}`));
@@ -842,6 +845,15 @@
     </div>`;
   }
 
+  // The saved PDF is named after the page title, so give each printout a dated title.
+  const BASE_TITLE = document.title;
+  function printAs(kind) {
+    const wd = new Date(state.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long' });
+    document.title = `OPD ${kind} ${state.date} (${wd})`;
+    window.addEventListener('afterprint', () => (document.title = BASE_TITLE), { once: true });
+    window.print();
+  }
+
   function printSchedule() {
     const all = day().rows || [];
     const byId = new Map(all.map((r) => [r.id, r]));
@@ -860,7 +872,7 @@
           )
           .join('')}</tbody>
       </table>`;
-    window.print();
+    printAs('Schedule');
   }
   function download(name, text, type) {
     const a = document.createElement('a');
@@ -1103,13 +1115,13 @@
           new Map(rows.map((r) => [r.id, r])),
           { print: true }
         )}</div>`;
-        window.print();
+        printAs('Lunch Chart');
         break;
       }
       case 'print-floor': {
         const rows = d.rows || [];
         $('#printArea').innerHTML = floorSheet(rows, new Map(rows.map((r) => [r.id, r])));
-        window.print();
+        printAs('Floor Sheet');
         break;
       }
       case 'view':
@@ -1190,6 +1202,15 @@
     if (el.id === 'fileIn') {
       addFiles(el.files);
       el.value = '';
+      return;
+    }
+    if (state.step === 'review' && (el.dataset.f === 'start' || el.dataset.f === 'end')) {
+      // shifts are always on the hour or half hour
+      const v = T.fromInput(el.value);
+      if (v != null && v % 30) {
+        el.value = T.toInput(Math.round(v / 30) * 30);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       return;
     }
     if (state.step !== 'schedule' || !el.dataset.f) return;
@@ -1318,7 +1339,7 @@
     const themeOpt = (v, ic, label) =>
       `<label><input type="radio" name="theme" value="${v}" ${th === v ? 'checked' : ''} /><span>${icon(ic)}${label}</span></label>`;
     const num = (name, v, step) => `<input type="number" name="${name}" value="${v}" step="${step || 0.5}" min="0" />`;
-    const time = (name, v) => `<input type="time" step="900" name="${name}" value="${T.toInput(v)}" />`;
+    const time = (name, v) => `<input type="time" step="1800" name="${name}" value="${T.toInput(v)}" />`;
     setDlg.innerHTML = `
       <header><div><p class="eyebrow">Your store</p><h3 id="settingsTitle">Settings</h3></div><button class="icon-btn" type="button" data-dlg="close" aria-label="Close settings">${icon('x')}</button></header>
       <form class="body" id="setForm" onsubmit="return false">
@@ -1379,6 +1400,8 @@
               <span class="muted small">Adds a printable sheet: Picking, BR &amp; PR, and Dispensers hour by hour.</span></label>
             <span class="switch"><input type="checkbox" role="switch" id="floorSheetToggle" name="floorSheet" ${s.floorSheet ? 'checked' : ''} /><span class="switch-ui" aria-hidden="true"></span></span>
           </div>
+          <div class="form-line">On the floor sheet, dispensing starts at ${time('dispOpen', s.dispOpen)}
+            <span class="muted small">(dispensers who start earlier pick until then)</span></div>
         </fieldset>
       </form>
       <footer>
@@ -1446,6 +1469,7 @@
         rotationDays: n('rotationDays', s0.rotationDays),
         rotation: n('rotation', s0.rotation),
         floorSheet: f.get('floorSheet') === 'on',
+        dispOpen: tm('dispOpen', s0.dispOpen),
       };
       if (next.deptStart == null || next.deptEnd == null || next.deptEnd <= next.deptStart) return toast('Check the department hours.');
       settings = Sched.mergeSettings(next);

@@ -27,6 +27,9 @@
   const POOL = ['PICK', 'DISP'];
   const SINGLE = ['BR', 'PREP', 'SM'];
   const isSingle = (r) => SINGLE.includes(r);
+  // one-person jobs whose lunch needs a picker/dispenser to cover (SM / EXP doesn't)
+  const COVERED = ['BR', 'PREP'];
+  const needsCover = (r) => COVERED.includes(r);
   const isPool = (r) => POOL.includes(r);
 
   function defaultSettings() {
@@ -63,6 +66,7 @@
       rotationDays: 7,
       rotation: 2, // 0 off, 1 low, 2 normal, 3 strong
       floorSheet: true, // show the Floor sheet print button
+      dispOpen: 360, // floor sheet: dispensing starts at 6:00 AM (5-6 AM dispensers pick first)
     };
   }
 
@@ -123,6 +127,7 @@
     out.rotationDays = num(s.rotationDays, d.rotationDays, 1, 28, true);
     out.rotation = num(s.rotation, d.rotation, 0, 3, true);
     out.floorSheet = s.floorSheet === undefined ? d.floorSheet : !!s.floorSheet;
+    out.dispOpen = num(s.dispOpen, d.dispOpen, 0, 1380);
     return out;
   }
 
@@ -408,7 +413,7 @@
           const min = g === 'PICK' ? s.minPick : inDisp(x) ? s.minDisp : 0;
           if (onFloor < min) c += 60;
           c += (8 * (out[g][i] + 1)) / Math.max(1, working[g][i]);
-        } else {
+        } else if (needsCover(r.role)) {
           // someone from the floor has to cover: prefer times with more people around
           const floor = working.PICK[i] + working.DISP[i] - out.PICK[i] - out.DISP[i];
           if (floor < 2) c += 30;
@@ -457,7 +462,7 @@
     return rows.sort((a, b) => a.start - b.start || a.end - b.end || a.name.localeCompare(b.name));
   }
 
-  /** Pick a picker/dispenser to cover each Backroom / Prep / SM lunch. Keeps locked covers. */
+  /** Pick a picker/dispenser to cover each Backroom / Prep lunch. Keeps locked covers. */
   function assignCovers(rows, sIn) {
     const s = mergeSettings(sIn);
     const pool = rows.filter((r) => isPool(r.role));
@@ -466,7 +471,7 @@
       if (!busy.has(id)) busy.set(id, []);
       busy.get(id).push([a, b]);
     };
-    const singles = rows.filter((r) => isSingle(r.role)).sort((a, b) => (a.lunch || 0) - (b.lunch || 0));
+    const singles = rows.filter((r) => needsCover(r.role)).sort((a, b) => (a.lunch || 0) - (b.lunch || 0));
     const byId = new Map(rows.map((r) => [r.id, r]));
     // a hand-picked cover only stays if it still makes sense
     const validCover = (r, c) =>
@@ -484,7 +489,7 @@
         else r.coverLock = false;
       }
     }
-    for (const r of rows) if (!isSingle(r.role)) {
+    for (const r of rows) if (!needsCover(r.role)) {
       r.coverBy = null;
       r.coverLock = false;
     }
@@ -523,7 +528,7 @@
     const s = mergeSettings(sIn);
     const byId = new Map(rows.map((r) => [r.id, r]));
     const singles = s.singleRoles.filter((x) => x.enabled);
-    const covering = (c, t) => rows.some((r) => r.coverBy === c.id && isSingle(r.role) && onLunch(r, t));
+    const covering = (c, t) => rows.some((r) => r.coverBy === c.id && needsCover(r.role) && onLunch(r, t));
 
     const ticks = [];
     for (let t = s.deptStart; t < s.deptEnd; t += TICK) {
@@ -544,6 +549,7 @@
         for (const r of rows) {
           if (r.role !== sr.key || !works(r, t)) continue;
           if (!onLunch(r, t)) n++;
+          else if (!needsCover(r.role)) n++; // e.g. SM / EXP: their lunch is an accepted gap
           else if (r.coverBy && byId.has(r.coverBy) && works(byId.get(r.coverBy), t) && !onLunch(byId.get(r.coverBy), t)) n++;
         }
         k.single[sr.key] = n;
@@ -606,7 +612,7 @@
       if (expected && r.lunch == null) warnings.push({ kind: 'lunch', id: r.id, text: `${r.name} (${Time.hours(r.start, r.end)}h) has no lunch` });
       const p = lunchProblem(r, s);
       if (p) warnings.push({ kind: 'lunch', id: r.id, text: `${r.name}'s lunch is ${p}` });
-      if (isSingle(r.role) && r.lunch != null && r.lunchLen) {
+      if (needsCover(r.role) && r.lunch != null && r.lunchLen) {
         const c = byId.get(r.coverBy);
         if (!c) warnings.push({ kind: 'lunch', id: r.id, text: `Nobody is covering ${r.name}'s ${ROLES[r.role].long} lunch` });
         else if (c.start > r.lunch || c.end < r.lunch + r.lunchLen)
@@ -632,6 +638,8 @@
     SINGLE,
     POOL,
     isSingle,
+    needsCover,
+    COVERED,
     isPool,
     defaultSettings,
     mergeSettings,
