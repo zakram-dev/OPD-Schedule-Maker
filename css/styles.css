@@ -3412,6 +3412,10 @@ div.tl {
   }
   .fs-sec {
     margin-top: 10px;
+    break-inside: avoid;
+  }
+  .fs-table thead {
+    display: table-header-group; /* repeat the header row if a long table spills onto the next page */
   }
   .fs-sec h2 {
     margin: 0 0 4px;
@@ -3503,7 +3507,7 @@ div.tl {
   .fs-track {
     position: relative;
     height: 20px;
-    background: repeating-linear-gradient(to right, #c8c8c8 0, #c8c8c8 1px, transparent 1px, transparent var(--hourw));
+    background: #fff repeating-linear-gradient(to right, #c8c8c8 0, #c8c8c8 1px, #fff 1px, #fff var(--hourw));
   }
   .fs-shift {
     position: absolute;
@@ -3523,8 +3527,9 @@ div.tl {
     border-radius: 3px;
     background: #000;
     color: #fff;
-    font-size: 9.5px;
+    font-size: 8px;
     font-weight: 700;
+    letter-spacing: -0.02em;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -3675,22 +3680,54 @@ div.tl {
   }
   .print-chart .gc-track {
     height: 22px;
+    background-color: #fff;
+    background-image: repeating-linear-gradient(
+      to right,
+      #cfcfcf 0,
+      #cfcfcf 1px,
+      #fff 1px,
+      #fff calc(var(--hourw) / 2),
+      #ececec calc(var(--hourw) / 2),
+      #ececec calc(var(--hourw) / 2 + 1px),
+      #fff calc(var(--hourw) / 2 + 1px),
+      #fff var(--hourw)
+    );
+  }
+  .print-chart .gc-head .gc-track,
+  .print-chart .gc-sec .gc-track {
+    background-image: none;
   }
   .print-chart .gc-sec .gc-track {
-    height: 28px;
-  }
-  .print-chart .gc-lc span {
-    top: 6px;
-    bottom: 6px;
+    background-color: var(--cs);
   }
   .print-chart .gc-shift {
-    top: 6px;
-    bottom: 6px;
+    box-shadow: none;
+  }
+  /* the timeline fills the whole row (rows grow when a name wraps on a portrait page)
+     and everything on it is centred vertically */
+  .print-chart .gc-row .gc-track,
+  .print-chart .gc-sec .gc-track {
+    height: auto;
+    min-height: 24px;
+  }
+  .print-chart .gc-sec .gc-track {
+    min-height: 28px;
+  }
+  .print-chart .gc-lc span {
+    top: calc(50% - 8px);
+    bottom: auto;
+    height: 16px;
+  }
+  .print-chart .gc-shift {
+    top: calc(50% - 5px);
+    bottom: auto;
+    height: 10px;
   }
   .print-chart .gc-lunch,
   .print-chart .gc-cover {
-    top: 2px;
-    bottom: 2px;
+    top: calc(50% - 9px);
+    bottom: auto;
+    height: 18px;
   }
   .print-chart .gc-now {
     display: none;

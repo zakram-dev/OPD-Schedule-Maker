@@ -894,8 +894,14 @@
   function printAs(kind) {
     const wd = new Date(state.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long' });
     document.title = `OPD ${kind} ${state.date} (${wd})`;
-    window.addEventListener('afterprint', () => (document.title = BASE_TITLE), { once: true });
     window.print();
+    // Phones report "printing done" before they create the PDF, so 'afterprint' is too early.
+    // Keep the dated title until the person next taps, clicks or types on the page.
+    const restore = () => {
+      document.title = BASE_TITLE;
+      ['pointerdown', 'keydown'].forEach((t) => document.removeEventListener(t, restore, true));
+    };
+    setTimeout(() => ['pointerdown', 'keydown'].forEach((t) => document.addEventListener(t, restore, true)), 0);
   }
 
   function printSchedule() {
