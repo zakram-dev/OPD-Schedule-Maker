@@ -66,3 +66,7 @@ it to another computer. (A shared online database is the next step for multi-dev
 - `js/app.js`: the website screens
 - `css/styles.css` + `fonts/`: the look; see [DESIGN.md](DESIGN.md) for the design system
 - `privacy.html`, `terms.html`: the Privacy and Terms pages (Help lives inside `index.html`)
+
+## Support
+
+OPD Schedule Maker is free. If it saves you time, you can leave a tip at [ko-fi.com/zeeogp](https://ko-fi.com/zeeogp).

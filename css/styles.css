@@ -2668,6 +2668,20 @@ div.tl {
   text-decoration-color: var(--signal);
   background: var(--surface-2);
 }
+.foot-tip {
+  gap: 6px;
+}
+.foot-tip .ic {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+  color: var(--bad);
+  transition: transform var(--t-base) var(--ease-spring);
+}
+.foot-tip:hover .ic {
+  transform: scale(1.18);
+}
 .foot-legal {
   font-size: 0.8125rem;
   color: var(--ink-3);
