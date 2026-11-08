@@ -62,6 +62,7 @@
       dispTo: 1320,
       rotationDays: 7,
       rotation: 2, // 0 off, 1 low, 2 normal, 3 strong
+      floorSheet: true, // show the Floor sheet print button
     };
   }
 
@@ -121,6 +122,7 @@
     }
     out.rotationDays = num(s.rotationDays, d.rotationDays, 1, 28, true);
     out.rotation = num(s.rotation, d.rotation, 0, 3, true);
+    out.floorSheet = s.floorSheet === undefined ? d.floorSheet : !!s.floorSheet;
     return out;
   }
 

@@ -434,7 +434,7 @@
   ];
   const hm = (m) => T.short(m).replace(/[ap]$/, ''); // 9, 9:30
 
-  function chartGrid(rows, byId) {
+  function chartGrid(rows, byId, opts) {
     const S0 = settings.deptStart;
     const E0 = settings.deptEnd;
     const span = E0 - S0;
@@ -462,7 +462,9 @@
       const list = rows
         .filter((r) => sec.roles.includes(r.role))
         .sort(
-          (a, b) =>
+          opts && opts.print
+            ? printOrder
+            : (a, b) =>
             (a.role === 'SM' ? 0 : 1) - (b.role === 'SM' ? 0 : 1) ||
             (a.lunch != null ? a.lunch : 9999 + a.start) - (b.lunch != null ? b.lunch : 9999 + b.start) ||
             a.start - b.start ||
@@ -488,7 +490,7 @@
             ? `<span class="gc-meta">cover: ${cover ? esc(cover.name.split(' ')[0]) : '<b class="bad">none</b>'}</span>`
             : '';
         rowIndex++;
-        body += `<div class="gc-row" data-act="focus" data-id="${r.id}" style="--i:${Math.min(rowIndex, 40)}" role="button" tabindex="0" aria-label="${esc(r.name)}, ${esc(roleLong(r.role))}, ${T.fmt(r.start)} to ${T.fmt(r.end)}${hasLunch ? `, lunch ${T.fmt(r.lunch)}` : ''}. Edit" title="Click to edit ${esc(r.name)}">
+        body += `<div class="gc-row${r.role === 'TL' ? ' is-tl' : ''}" data-act="focus" data-id="${r.id}" style="--i:${Math.min(rowIndex, 40)}" role="button" tabindex="0" aria-label="${esc(r.name)}, ${esc(roleLong(r.role))}, ${T.fmt(r.start)} to ${T.fmt(r.end)}${hasLunch ? `, lunch ${T.fmt(r.lunch)}` : ''}. Edit" title="Click to edit ${esc(r.name)}">
           <div class="gc-name"><span class="gc-nm">${esc(r.name)}</span>
             <span class="gc-meta">${r.role === 'SM' ? '<i class="tag r-SM">SM/EXP</i> ' : ''}${T.short(r.start)}–${T.short(r.end)}${sub ? ' · ' : ''}${sub}</span></div>
           <div class="gc-track">
@@ -611,6 +613,7 @@
     const headAside = `
       <button class="btn" type="button" data-act="goto-review">${icon('users')}<span>Edit people</span></button>
       <button class="btn" type="button" data-act="print">${icon('print')}<span>Print</span></button>
+      ${settings.floorSheet ? `<button class="btn" type="button" data-act="print-floor">${icon('clipboard')}<span>Floor sheet</span></button>` : ''}
       <button class="btn" type="button" data-act="csv">${icon('download')}<span>CSV</span></button>`;
     return `
       ${viewHead('Step 3 of 3 · Jobs &amp; lunches', esc(niceDate(state.date)), `${rows.length} people on the schedule. ${
@@ -708,16 +711,148 @@
       if (s.coverBy === r.id && Sched.isSingle(s.role) && s.lunch != null) n.push(`${roleLabel(s.role)} ${T.range(s.lunch, s.lunch + s.lunchLen)}`);
     return n.join('; ');
   }
+  // Printouts list people by start hour, then whoever leaves first (shortest shift on top).
+  const printOrder = (a, b) =>
+    Math.floor(a.start / 60) - Math.floor(b.start / 60) || a.end - b.end || a.start - b.start || a.name.localeCompare(b.name);
+  const leadNames = (rows) => rows.filter((r) => r.isTL || r.role === 'TL').sort(printOrder).map((r) => r.name);
+  function printHead(title, rows) {
+    const tl = leadNames(rows);
+    return `<header class="print-head"><div class="print-title">${esc(title)}</div>${
+      tl.length ? `<div class="print-leads">Team leads: ${tl.map((n) => `<b>${esc(n)}</b>`).join(' · ')}</div>` : ''
+    }</header>`;
+  }
+  const overlap = (a, b, c, d) => Math.max(0, Math.min(b, d) - Math.max(a, c));
+
+  // Floor sheet: black-and-white friendly print with Picking, BR & PR, and Dispensers sections.
+  function floorSheet(rows, byId) {
+    const S0 = settings.deptStart;
+    const E0 = settings.deptEnd;
+    const span = E0 - S0;
+    const pct = (m) => (Math.max(0, Math.min(span, m - S0)) / span) * 100;
+    const box = (a, b) => `left:${pct(a)}%;width:${pct(b) - pct(a)}%`;
+    const hours = [];
+    for (let t = Math.floor(S0 / 60) * 60; t < E0; t += 60) hours.push(t);
+    const hasLunch = (r) => r.lunch != null && r.lunchLen;
+    const coversBy = (id) => rows.filter((x) => x.coverBy === id && Sched.isSingle(x.role) && hasLunch(x));
+    const lunchCell = (r) => (hasLunch(r) ? T.range(r.lunch, r.lunch + r.lunchLen) : '<span class="fs-none">none</span>');
+    const tag = (r) => (r.role === 'SM' ? ' <i class="fs-tag">SM/EXP</i>' : r.role === 'BR' ? ' <i class="fs-tag">BR</i>' : r.role === 'PREP' ? ' <i class="fs-tag">PR</i>' : '');
+    const scale = hours
+      .filter((t) => t >= S0)
+      .map((t) => `<span class="${t === S0 ? 'first' : ''}" style="left:${pct(t)}%">${T.short(t)}</span>`)
+      .join('');
+
+    const gantt = (title, sub, list) => {
+      if (!list.length) return '';
+      return `<section class="fs-sec">
+        <h2>${title} <small>${sub} · ${list.length} ${list.length === 1 ? 'person' : 'people'}</small></h2>
+        <table class="fs-table fs-gantt">
+          <thead><tr><th class="fs-n">Name</th><th class="fs-s">Shift</th><th class="fs-l">Lunch</th><th class="fs-tl"><div class="fs-scale">${scale}</div></th></tr></thead>
+          <tbody>${list
+            .map((r) => {
+              const cover = Sched.isSingle(r.role) && r.role !== 'SM' && hasLunch(r) ? (r.coverBy && byId.has(r.coverBy) ? byId.get(r.coverBy).name : null) : undefined;
+              return `<tr>
+                <td class="fs-n"><b>${esc(r.name)}</b>${tag(r)}${cover !== undefined ? `<div class="fs-sub">Lunch cover: ${cover ? esc(cover) : '<b>none</b>'}</div>` : ''}</td>
+                <td class="fs-s">${T.short(r.start)}–${T.short(r.end)}</td>
+                <td class="fs-l">${lunchCell(r)}</td>
+                <td class="fs-tl"><div class="fs-track" style="--hourw:${(60 / span) * 100}%">
+                  <div class="fs-shift" style="${box(r.start, r.end)}"></div>
+                  ${hasLunch(r) ? `<div class="fs-lunch" style="${box(r.lunch, r.lunch + r.lunchLen)}">${r.lunchLen < 60 ? '½' : r.lunch % 60 ? hm(r.lunch) : hm(r.lunch) + '–' + hm(r.lunch + r.lunchLen)}</div>` : ''}
+                  ${coversBy(r.id)
+                    .map((x) => `<div class="fs-cover" style="${box(x.lunch, x.lunch + x.lunchLen)}">${roleLabel(x.role) === 'Prep' ? 'PR' : roleLabel(x.role)}</div>`)
+                    .join('')}
+                </div></td>
+              </tr>`;
+            })
+            .join('')}</tbody>
+        </table>
+      </section>`;
+    };
+
+    const picking = rows.filter((r) => r.role === 'PICK' || r.role === 'SM').sort(printOrder);
+    const brpr = rows.filter((r) => r.role === 'BR' || r.role === 'PREP').sort(printOrder);
+    const disp = rows.filter((r) => r.role === 'DISP').sort(printOrder);
+
+    // what a dispenser is doing in each hour
+    const hourInfo = (r, h) => {
+      const on = overlap(r.start, r.end, h, h + 60);
+      const lunch = hasLunch(r) ? overlap(r.lunch, r.lunch + r.lunchLen, h, h + 60) : 0;
+      const cov = coversBy(r.id).filter((x) => overlap(x.lunch, x.lunch + x.lunchLen, h, h + 60) > 0);
+      const covMin = cov.reduce((m, x) => m + overlap(x.lunch, x.lunch + x.lunchLen, h, h + 60), 0);
+      return { on, lunch, cov, work: Math.max(0, on - lunch - covMin) };
+    };
+    const short = (k) => (k === 'PREP' ? 'PR' : roleLabel(k));
+    const dispGrid = disp.length
+      ? `<section class="fs-sec">
+        <h2>Dispensers <small>by hour · ${disp.length} ${disp.length === 1 ? 'person' : 'people'}</small></h2>
+        <table class="fs-table fs-grid">
+          <thead><tr><th class="fs-n">Name</th><th class="fs-s">Shift</th><th class="fs-l">Lunch</th>${hours.map((h) => `<th class="fs-h">${T.short(h)}</th>`).join('')}</tr></thead>
+          <tbody>${disp
+            .map(
+              (r) => `<tr><td class="fs-n"><b>${esc(r.name)}</b></td><td class="fs-s">${T.short(r.start)}–${T.short(r.end)}</td><td class="fs-l">${lunchCell(r)}</td>${hours
+                .map((h) => {
+                  const i = hourInfo(r, h);
+                  if (i.lunch > 0) return '<td class="fs-h fs-lunchc">L</td>';
+                  if (i.cov.length) return `<td class="fs-h fs-cov">${i.cov.map((x) => short(x.role)).join('/')}</td>`;
+                  if (i.work >= 60) return '<td class="fs-h fs-on"></td>';
+                  if (i.work > 0) return `<td class="fs-h fs-part${r.start > h ? ' late' : ''}"></td>`; // shade the half they work
+                  return '<td class="fs-h"></td>';
+                })
+                .join('')}</tr>`
+            )
+            .join('')}</tbody>
+        </table>
+        <p class="fs-key"><i class="k fs-on"></i>dispensing &nbsp; <i class="k fs-part"></i>part of the hour &nbsp; <i class="k fs-lunchc">L</i>lunch &nbsp; <i class="k fs-cov">PR</i>covering a lunch</p>
+      </section>`
+      : '';
+
+    const roster = disp.length
+      ? `<section class="fs-sec">
+        <h2>Dispensing each hour <small>who is loading cars, hour by hour</small></h2>
+        <table class="fs-table fs-roster">
+          <thead><tr><th class="fs-hr">Hour</th><th class="fs-ct">#</th><th>Dispensing</th></tr></thead>
+          <tbody>${hours
+            .map((h) => {
+              const people = disp
+                .map((r) => ({ r, i: hourInfo(r, h) }))
+                .filter((x) => x.i.work > 0)
+                .map(({ r, i }) => {
+                  const notes = [];
+                  if (r.start > h && r.start < h + 60) notes.push('from ' + T.short(r.start));
+                  if (r.end > h && r.end < h + 60) notes.push('until ' + T.short(r.end));
+                  if (i.lunch > 0) notes.push(r.lunch > h ? 'lunch ' + T.short(r.lunch) : 'back ' + T.short(r.lunch + r.lunchLen));
+                  i.cov.forEach((x) => notes.push(`covers ${short(x.role)} ${T.short(x.lunch)}`));
+                  return `<span class="fs-person">${esc(r.name)}${notes.length ? ` <small>(${notes.join(', ')})</small>` : ''}</span>`;
+                });
+              return `<tr class="${people.length ? '' : 'empty'}"><td class="fs-hr">${T.fmt(h)}</td><td class="fs-ct">${people.length}</td><td>${
+                people.length ? people.join('<span class="fs-sep"> · </span>') : '—'
+              }</td></tr>`;
+            })
+            .join('')}</tbody>
+        </table>
+      </section>`
+      : '';
+
+    return `<div class="print-floor">
+      ${printHead('Floor sheet · ' + niceDate(state.date), rows)}
+      <p class="fs-key fs-key-top"><i class="k k-shift"></i>shift &nbsp; <i class="k fs-lunchc">9–10</i>lunch &nbsp; <i class="k k-cover">PR</i>covering a lunch</p>
+      ${gantt('Picking', 'Pickers + SM / EXP', picking)}
+      ${gantt('Backroom &amp; Prep', 'BR + PR', brpr)}
+      ${dispGrid}
+      ${roster}
+    </div>`;
+  }
+
   function printSchedule() {
-    const rows = day().rows || [];
-    const byId = new Map(rows.map((r) => [r.id, r]));
+    const all = day().rows || [];
+    const byId = new Map(all.map((r) => [r.id, r]));
+    const rows = all.slice().sort(printOrder);
     $('#printArea').innerHTML = `
-      <div class="print-title">${esc(niceDate(state.date))}</div>
+      ${printHead(niceDate(state.date), all)}
       <table class="print-table">
         <thead><tr><th>Name</th><th>Start</th><th>End</th><th>Hours</th><th>Lunch</th><th>Assignment</th><th>Cover</th></tr></thead>
         <tbody>${rows
           .map(
-            (r) => `<tr class="${r.role === 'DISP' ? 'shade' : ''}"><td>${esc(r.name)}</td><td class="num">${T.fmt(r.start)}</td><td class="num">${T.fmt(
+            (r) => `<tr class="${r.role === 'DISP' ? 'shade' : ''}${r.isTL ? ' tl' : ''}"><td>${esc(r.name)}</td><td class="num">${T.fmt(r.start)}</td><td class="num">${T.fmt(
               r.end
             )}</td><td class="num">${T.hours(r.start, r.end)}</td><td>${r.lunch != null && r.lunchLen ? T.range(r.lunch, r.lunch + r.lunchLen) : ''}</td><td>${esc(
               roleLabel(r.role)
@@ -963,10 +1098,17 @@
         break;
       case 'print-chart': {
         const rows = d.rows || [];
-        $('#printArea').innerHTML = `<div class="print-chart"><div class="print-title">Lunch chart · ${esc(niceDate(state.date))}</div>${chartLegend()}${chartGrid(
+        $('#printArea').innerHTML = `<div class="print-chart">${printHead('Lunch chart · ' + niceDate(state.date), rows)}${chartLegend()}${chartGrid(
           rows,
-          new Map(rows.map((r) => [r.id, r]))
+          new Map(rows.map((r) => [r.id, r])),
+          { print: true }
         )}</div>`;
+        window.print();
+        break;
+      }
+      case 'print-floor': {
+        const rows = d.rows || [];
+        $('#printArea').innerHTML = floorSheet(rows, new Map(rows.map((r) => [r.id, r])));
         window.print();
         break;
       }
@@ -1231,7 +1373,12 @@
               ${themeOpt('auto', 'monitor', 'Match device')}
             </div>
           </div>
-          <p class="muted small" style="margin:4px 0 0">Light is the default. This choice is saved on this device only.</p>
+          <p class="muted small" style="margin:4px 0 var(--s-3)">Light is the default. This choice is saved on this device only.</p>
+          <div class="form-line pref-line switch-line">
+            <label for="floorSheetToggle"><span class="pref-label">Floor sheet button</span>
+              <span class="muted small">Adds a printable sheet: Picking, BR &amp; PR, and Dispensers hour by hour.</span></label>
+            <span class="switch"><input type="checkbox" role="switch" id="floorSheetToggle" name="floorSheet" ${s.floorSheet ? 'checked' : ''} /><span class="switch-ui" aria-hidden="true"></span></span>
+          </div>
         </fieldset>
       </form>
       <footer>
@@ -1298,6 +1445,7 @@
         dispTo: tm('dispTo', s0.dispTo),
         rotationDays: n('rotationDays', s0.rotationDays),
         rotation: n('rotation', s0.rotation),
+        floorSheet: f.get('floorSheet') === 'on',
       };
       if (next.deptStart == null || next.deptEnd == null || next.deptEnd <= next.deptStart) return toast('Check the department hours.');
       settings = Sched.mergeSettings(next);

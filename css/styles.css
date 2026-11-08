@@ -28,6 +28,13 @@
   src: url('../fonts/barlow-600.woff2') format('woff2');
 }
 @font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/barlow-700.woff2') format('woff2');
+}
+@font-face {
   font-family: 'Barlow Condensed';
   font-style: normal;
   font-weight: 600;
@@ -2093,9 +2100,18 @@ tbody tr:last-child > * {
 .sched td.hrs {
   color: var(--ink-3);
 }
-.sched tr.tl th.name,
 .sched tr.tl td {
   color: var(--ink-3);
+}
+.sched tr.tl th.name {
+  font-weight: 700;
+  color: var(--ink);
+}
+.gc-row.is-tl .gc-nm {
+  font-weight: 700;
+}
+.review tr:has(input[data-f='isTL']:checked) input[data-f='name'] {
+  font-weight: 700;
 }
 .sched tbody tr {
   transition: background-color var(--t-fast) ease;
@@ -2513,6 +2529,65 @@ tbody tr:last-child > * {
   font-weight: 600;
 }
 
+/* on/off switch */
+.switch-line {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--s-4);
+}
+.switch-line label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  cursor: pointer;
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 48px;
+  height: 28px;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.switch-ui {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  transition: background-color var(--t-base) ease;
+}
+.switch-ui::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--t-base) var(--ease-spring);
+}
+.switch input:checked + .switch-ui {
+  background: var(--ok);
+}
+.switch input:checked + .switch-ui::after {
+  transform: translateX(20px);
+}
+.switch input:focus-visible + .switch-ui {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* toast */
 .toast {
   position: fixed;
@@ -2865,8 +2940,11 @@ tbody tr:last-child > * {
     width: 100%;
   }
   .head-tools .btn {
-    flex: 1;
+    flex: 1 1 calc(50% - var(--s-1));
     padding: 0 var(--s-2);
+  }
+  .head-tools:has(> :nth-child(3):last-child) .btn {
+    flex-basis: 0;
   }
 
   /* review rows → cards */
@@ -3289,6 +3367,250 @@ tbody tr:last-child > * {
   .print-table td.num {
     text-align: right;
   }
+  .print-table tr.tl td {
+    font-weight: 700;
+  }
+  .print-head {
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  .print-head .print-title {
+    margin: 0;
+  }
+  .print-leads {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+  .print-leads b {
+    font-weight: 700;
+  }
+  .print-chart .gc-row.is-tl .gc-nm {
+    font-weight: 700;
+  }
+
+  /* floor sheet: black and white friendly */
+  .print-floor {
+    page: floor;
+    color: #000;
+    font-family: var(--font-ui);
+  }
+  .print-floor,
+  .print-floor * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .fs-sec {
+    margin-top: 10px;
+  }
+  .fs-sec h2 {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    break-after: avoid;
+  }
+  .fs-sec h2 small {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .fs-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 10.5px;
+  }
+  .fs-table th,
+  .fs-table td {
+    position: static;
+    padding: 2px 4px;
+    border: 1px solid #888;
+    background: #fff;
+    color: #000;
+    font-family: var(--font-ui);
+    font-size: 10.5px;
+    letter-spacing: 0;
+    text-transform: none;
+    vertical-align: middle;
+    text-align: left;
+  }
+  .fs-table thead th {
+    background: #e6e6e6;
+    font-weight: 700;
+  }
+  .fs-table tr {
+    break-inside: avoid;
+  }
+  .fs-n {
+    width: 150px;
+  }
+  .fs-s {
+    width: 84px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .fs-l {
+    width: 74px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .fs-none {
+    color: #666;
+  }
+  .fs-sub {
+    font-size: 9.5px;
+  }
+  .fs-tag {
+    font-style: normal;
+    font-size: 8.5px;
+    font-weight: 700;
+    padding: 0 3px;
+    border: 1px solid #000;
+    border-radius: 3px;
+  }
+  .fs-gantt .fs-tl {
+    padding: 0;
+  }
+  .fs-scale {
+    position: relative;
+    height: 14px;
+  }
+  .fs-scale span {
+    position: absolute;
+    top: 1px;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .fs-scale span.first {
+    transform: translateX(2px);
+  }
+  .fs-track {
+    position: relative;
+    height: 20px;
+    background: repeating-linear-gradient(to right, #c8c8c8 0, #c8c8c8 1px, transparent 1px, transparent var(--hourw));
+  }
+  .fs-shift {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #d4d4d4;
+  }
+  .fs-lunch {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 3px;
+    background: #000;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .fs-cover {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    border: 1.5px dashed #000;
+    border-radius: 3px;
+    background: #fff;
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+  .fs-grid .fs-h {
+    padding: 0;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .fs-grid thead .fs-h {
+    font-size: 9px;
+  }
+  .fs-grid tbody td.fs-h {
+    height: 18px;
+  }
+  .fs-on {
+    background: #bdbdbd !important;
+  }
+  .fs-part {
+    background: linear-gradient(90deg, #bdbdbd 50%, #fff 50%) !important;
+  }
+  .fs-part.late {
+    background: linear-gradient(90deg, #fff 50%, #bdbdbd 50%) !important;
+  }
+  .fs-lunchc {
+    background: #000 !important;
+    color: #fff !important;
+  }
+  .fs-cov {
+    outline: 1.5px dashed #000;
+    outline-offset: -3px;
+  }
+  .fs-key {
+    margin: 4px 0 0;
+    font-size: 10px;
+  }
+  .fs-key-top {
+    text-align: center;
+    margin-bottom: 2px;
+  }
+  .fs-key .k {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 12px;
+    padding: 0 3px;
+    margin-right: 3px;
+    vertical-align: -2px;
+    border: 1px solid #888;
+    font-style: normal;
+    font-size: 8.5px;
+    font-weight: 700;
+  }
+  .fs-key .k-shift {
+    width: 22px;
+    border-color: #444;
+    border-radius: 6px;
+    background: #d4d4d4;
+  }
+  .fs-key .k-cover {
+    border: 1.5px dashed #000;
+  }
+  .fs-roster .fs-hr {
+    width: 70px;
+    white-space: nowrap;
+    font-weight: 700;
+  }
+  .fs-roster .fs-ct {
+    width: 28px;
+    text-align: center;
+    font-weight: 700;
+  }
+  .fs-roster tr.empty td {
+    color: #777;
+  }
+  .fs-person {
+    white-space: nowrap;
+  }
+  .fs-person small {
+    font-size: 9px;
+  }
+  .fs-sep {
+    color: #888;
+  }
   .print-chart {
     page: chart;
   }
@@ -3342,4 +3664,8 @@ tbody tr:last-child > * {
 @page chart {
   size: landscape;
   margin: 8mm;
+}
+@page floor {
+  size: landscape;
+  margin: 7mm;
 }
