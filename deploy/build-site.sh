@@ -48,6 +48,16 @@ sed -i.bak \
   "$OUT/index.html"
 rm -f "$OUT/index.html.bak"
 
+# Stamp the CSS/JS links with a content version, so browsers and Cloudflare
+# pick up every deploy right away instead of serving an old cached copy.
+VER="$(cat "$OUT"/css/*.css "$OUT"/js/*.js | cksum | cut -d' ' -f1)"
+sed -i.bak -E \
+  -e "s#href=\"css/([a-z]+)\.css\"#href=\"css/\1.css?v=$VER\"#g" \
+  -e "s#src=\"js/([a-z]+)\.js\"#src=\"js/\1.js?v=$VER\"#g" \
+  "$OUT/index.html"
+rm -f "$OUT/index.html.bak"
+echo "Asset version $VER"
+
 if grep -q "cdn.jsdelivr.net" "$OUT/index.html"; then
   echo "index.html still points at the CDN; update the versions in this script" >&2
   exit 1
