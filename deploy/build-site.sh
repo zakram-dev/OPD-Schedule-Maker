@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the production copy of the site into $1 (default: ./dist):
-#   - copies index.html, favicon-ogp.jpeg, css/, js/
+#   - copies index.html, favicon-ogp-48x48.png, css/, js/
 #   - downloads the free reading libraries (Tesseract, PDF.js, SheetJS) into vendor/
 #   - points the page at those local copies, so phones never need outside CDNs
 # Used by the Dockerfile; you can also run it by hand to test.
@@ -18,7 +18,7 @@ XLSX="0.18.5"
 
 rm -rf "$OUT"
 mkdir -p "$OUT/vendor/tesseract-core" "$OUT/vendor/lang"
-cp "$SRC/index.html" "$SRC/favicon-ogp.jpeg" "$OUT/"
+cp "$SRC/index.html" "$SRC/favicon-ogp-48x48.png" "$OUT/"
 cp -R "$SRC/css" "$SRC/js" "$OUT/"
 
 fetch() { # url dest

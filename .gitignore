@@ -17,8 +17,8 @@ tests/
 *.pdf
 *.jpg
 *.jpeg
-!favicon-ogp.jpeg
 *.png
+!favicon-ogp-48x48.png
 *.heic
 data/
 backups/
