@@ -63,30 +63,118 @@
     return c;
   }
 
-  /** Group words that sit on the same row, so "name ... time" columns join into one line. */
-  function rowsFromWords(words) {
-    const items = words
-      .filter((w) => w.text && w.text.trim() && w.confidence > 20 && w.bbox)
-      .map((w) => ({ text: w.text.trim(), x: w.bbox.x0, yc: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 }))
-      .sort((a, b) => a.yc - b.yc);
-    const rows = [];
-    for (const it of items) {
-      const row = rows[rows.length - 1];
-      if (row && Math.abs(it.yc - row.yc) < Math.max(8, 0.55 * Math.max(it.h, row.h))) {
-        row.items.push(it);
-        row.yc = (row.yc * (row.items.length - 1) + it.yc) / row.items.length;
-        row.h = Math.max(row.h, it.h);
-      } else rows.push({ yc: it.yc, h: it.h, items: [it] });
-    }
-    return rows.map((r) => r.items.sort((a, b) => a.x - b.x).map((i) => i.text).join(' '));
+  /** Words with their confidence and position (canvas pixels). */
+  function wordItems(data, dx) {
+    const out = [];
+    const push = (w) => {
+      if (!w || !w.bbox || !w.text || !w.text.trim()) return;
+      const b = w.bbox;
+      out.push({ text: w.text.trim(), conf: w.confidence, x0: b.x0 + (dx || 0), x1: b.x1 + (dx || 0), y0: b.y0, y1: b.y1, yc: (b.y0 + b.y1) / 2, h: b.y1 - b.y0 });
+    };
+    for (const bl of data.blocks || []) for (const p of bl.paragraphs || []) for (const l of p.lines || []) for (const w of l.words || []) push(w);
+    if (!out.length && data.words) data.words.forEach(push);
+    return out;
   }
 
-  function collectWords(data) {
-    const words = [];
-    for (const b of data.blocks || [])
-      for (const p of b.paragraphs || []) for (const l of p.lines || []) for (const w of l.words || []) words.push(w);
-    if (!words.length && data.words) words.push(...data.words);
-    return words;
+  /** Tesseract's own lines, as rows of words. */
+  function lineRows(data) {
+    const rows = [];
+    for (const bl of data.blocks || [])
+      for (const p of bl.paragraphs || [])
+        for (const l of p.lines || []) {
+          const items = wordItems({ blocks: [{ paragraphs: [{ lines: [l] }] }] });
+          if (items.length) rows.push(makeRow(items));
+        }
+    return rows;
+  }
+
+  /** Words grouped by height on the page, so "name ........ time" columns join into one row. */
+  function groupRows(items) {
+    const sorted = items.filter((w) => w.conf > 20).sort((a, b) => a.yc - b.yc);
+    const groups = [];
+    for (const it of sorted) {
+      const g = groups[groups.length - 1];
+      if (g && Math.abs(it.yc - g.yc) < Math.max(8, 0.55 * Math.max(it.h, g.h))) {
+        g.items.push(it);
+        g.yc = (g.yc * (g.items.length - 1) + it.yc) / g.items.length;
+        g.h = Math.max(g.h, it.h);
+      } else groups.push({ yc: it.yc, h: it.h, items: [it] });
+    }
+    return groups.map((g) => makeRow(g.items));
+  }
+
+  const minConf = (items) => (items.length ? Math.min(...items.map((i) => i.conf)) : 100);
+
+  /** A row of words → {text, nameConf, timeConf} for the parser, plus its geometry. */
+  function makeRow(items) {
+    items = items.slice().sort((a, b) => a.x0 - b.x0);
+    const t = items.findIndex((i) => /\d/.test(i.text));
+    const nameItems = t < 0 ? items : items.slice(0, t);
+    const timeItems = t < 0 ? [] : items.slice(t);
+    return {
+      items,
+      y0: Math.min(...items.map((i) => i.y0)),
+      y1: Math.max(...items.map((i) => i.y1)),
+      h: Math.max(...items.map((i) => i.h)),
+      line: { text: items.map((i) => i.text).join(' '), nameConf: minConf(nameItems), timeConf: minConf(timeItems) },
+    };
+  }
+
+  /**
+   * Second look at the time column: read only that strip, allowing just digits, ":", "AM", "PM"
+   * and "-". Fixes O/0, S/5, l/1 and B/8 mix-ups, and finds times the first pass missed.
+   */
+  async function rereadTimes(canvas, rows) {
+    const P = root.WS.Parser;
+    const shift = (line) => P.parseLines([line], { halfHours: true })[0];
+    const xs = rows
+      .filter((r) => shift(r.line))
+      .map((r) => (r.items.find((i) => /\d/.test(i.text)) || {}).x0)
+      .filter((x) => x != null)
+      .sort((a, b) => a - b);
+    if (xs.length < 2) return;
+    const colX = xs[Math.floor(xs.length / 2)];
+    const left = Math.max(0, Math.round(colX - 0.04 * canvas.width));
+    const crop = document.createElement('canvas');
+    crop.width = canvas.width - left;
+    crop.height = canvas.height;
+    crop.getContext('2d').drawImage(canvas, left, 0, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    const worker = await getTimeWorker();
+    const data = (await worker.recognize(crop, {}, { blocks: true })).data;
+    const times = wordItems(data, left);
+    // each reread word belongs to the one row it sits closest to (never to a sub-line under it)
+    const owner = new Map();
+    for (const w of times) {
+      let best = null;
+      let bd = Infinity;
+      for (const r of rows) {
+        const pad = 0.25 * r.h;
+        if (w.yc < r.y0 - pad || w.yc > r.y1 + pad) continue;
+        const dist = Math.abs(w.yc - (r.y0 + r.y1) / 2);
+        if (dist < bd) {
+          bd = dist;
+          best = r;
+        }
+      }
+      if (best) owner.set(best, (owner.get(best) || []).concat(w));
+    }
+    for (const r of rows) {
+      const mine = (owner.get(r) || []).sort((a, b) => a.x0 - b.x0);
+      if (!mine.length) continue;
+      const nameItems = r.items.filter((i) => i.x1 < left + 0.02 * canvas.width && !/\d/.test(i.text));
+      const cand = {
+        text: nameItems.map((i) => i.text).join(' ') + '   ' + mine.map((i) => i.text).join(' '),
+        nameConf: minConf(nameItems),
+        timeConf: minConf(mine),
+      };
+      const a = shift(r.line);
+      const b = shift(cand);
+      if (!b) continue;
+      if (!a) r.line = cand; // the first pass missed this row's times
+      else if (a.start !== b.start || a.end !== b.end) {
+        if (cand.timeConf > r.line.timeConf) r.line = Object.assign({}, cand, { nameConf: r.line.nameConf, text: r.line.text.slice(0, r.line.text.search(/\d/)) + '   ' + mine.map((i) => i.text).join(' ') });
+      } else r.line.timeConf = Math.max(r.line.timeConf, cand.timeConf); // both readings agree
+    }
   }
 
   let listener = null;
@@ -112,20 +200,53 @@
     return workerPromise;
   }
 
+  // A second reader that only knows the characters times use. Kept separate so its limits
+  // never affect how names are read.
+  let timeWorkerPromise = null;
+  function getTimeWorker() {
+    if (!timeWorkerPromise) {
+      const V = root.WS_VENDOR;
+      const abs = (p) => new URL(p, root.location.href).href;
+      const opts = { logger: (m) => listener && listener(m) };
+      if (V) Object.assign(opts, { workerPath: abs(V + 'worker.min.js'), corePath: abs(V + 'tesseract-core'), langPath: abs(V + 'lang') });
+      timeWorkerPromise = root.Tesseract.createWorker('eng', 1, opts)
+        .then(async (w) => {
+          await w.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1', tessedit_char_whitelist: '0123456789:APMapm.- ' });
+          return w;
+        })
+        .catch((e) => {
+          timeWorkerPromise = null;
+          throw e;
+        });
+    }
+    return timeWorkerPromise;
+  }
+
   const OCR = {
-    /** Read a canvas. onProgress(fraction, label). Returns text lines. */
+    /**
+     * Read a canvas. onProgress(fraction, label). Returns lines as {text, nameConf, timeConf}
+     * (confidence 0–100), which the parser accepts like plain strings.
+     */
     async recognizeCanvas(canvas, onProgress) {
       listener = (m) => onProgress && onProgress(m.progress || 0, m.status === 'recognizing text' ? 'Reading' : 'Loading photo reader');
       try {
         const worker = await getWorker();
-        const { data } = await worker.recognize(clean(canvas), {}, { text: true, blocks: true });
+        const page = clean(canvas);
+        const { data } = await worker.recognize(page, {}, { text: true, blocks: true });
         // Two readings of the same page: Tesseract's own lines, and words re-joined by row
         // (better when names and times sit in far-apart columns). Keep the one that finds more people.
-        const textLines = String(data.text || '').split('\n');
-        const words = collectWords(data);
-        const rowLines = words.length ? rowsFromWords(words) : [];
         const P = root.WS.Parser;
-        return rowLines.length && P.parseLines(rowLines).length > P.parseLines(textLines).length ? rowLines : textLines;
+        const byLine = lineRows(data);
+        const byRow = groupRows(wordItems(data));
+        const count = (rows) => P.parseLines(rows.map((r) => r.line)).length;
+        const rows = byRow.length && count(byRow) > count(byLine) ? byRow : byLine;
+        listener = (m) => onProgress && onProgress(m.progress || 0, 'Double-checking times on');
+        try {
+          await rereadTimes(page, rows);
+        } catch (e) {
+          console.warn('Time double-check skipped', e);
+        }
+        return rows.map((r) => r.line);
       } finally {
         listener = null;
       }

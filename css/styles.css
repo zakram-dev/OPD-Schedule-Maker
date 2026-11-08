@@ -1474,6 +1474,55 @@ thead th {
 .review tbody tr:hover {
   background: var(--surface-2);
 }
+.review tbody tr.needs-check,
+.review tbody tr.needs-check:hover {
+  background: var(--warn-soft);
+}
+.review tbody tr.needs-check > td:first-child {
+  box-shadow: inset 4px 0 0 var(--signal);
+}
+.check-notes {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+.check-note {
+  align-items: flex-start;
+  color: var(--warn-ink);
+}
+.check-note .ic {
+  margin-top: 2px;
+}
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--signal);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-btn .ic {
+  width: 14px;
+  height: 14px;
+}
+.ok-btn {
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+.stats .is-check {
+  --c: var(--signal);
+  --ci: var(--warn-ink);
+  background: var(--warn-soft);
+}
 .review tbody tr:focus-within {
   background: color-mix(in srgb, var(--focus) 5%, var(--surface));
 }
@@ -3033,6 +3082,9 @@ div.tl {
   .review .c-rm .icon-btn {
     width: 44px;
     height: 44px;
+  }
+  .review .link-btn {
+    min-height: 40px;
   }
 
   /* sticky action bar */

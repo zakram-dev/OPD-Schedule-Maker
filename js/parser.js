@@ -38,7 +38,7 @@
     return s;
   }
 
-  function findTimes(line) {
+  function findTimes(line, loose) {
     const toks = [];
     TOKEN.lastIndex = 0;
     let m;
@@ -48,10 +48,22 @@
       const mm = mins != null ? +mins : 0;
       const ap = m[4] ? m[4][0].toLowerCase() : null;
       if (mins == null && !ap) continue; // a bare number (hours column), not a time
-      if (h > 23 || mm > 59 || (ap && (h < 1 || h > 12))) continue;
-      toks.push({ h, mm, ap, index: m.index, endIndex: m.index + m[0].length });
+      // with the half-hour rule on, an impossible minute like ":80" is a misread ":30" (fixed later)
+      if (h > 23 || (mm > 59 && !loose) || (ap && (h < 1 || h > 12))) continue;
+      toks.push({ h, mm, mins, ap, index: m.index, endIndex: m.index + m[0].length });
     }
     return toks;
+  }
+
+  /**
+   * Shifts start and end on the hour or half hour, so a photo reading of ":38", ":80" or ":50"
+   * is a misread ":30", and ":08" or ":09" a misread ":00". Returns true when it changed the time.
+   */
+  function snapHalfHour(t) {
+    if (t.mm === 0 || t.mm === 30) return false;
+    const d = String(t.mins == null ? '' : t.mins).padStart(2, '0')[0];
+    t.mm = '35689'.includes(d) ? 30 : '0147'.includes(d) ? 0 : t.mm < 45 ? 30 : 0;
+    return true;
   }
 
   const to24 = (h, mm, ap) => (ap === 'a' ? (h % 12) * 60 + mm : ((h % 12) + 12) * 60 + mm);
@@ -97,13 +109,23 @@
     return x;
   }
 
-  function parseLines(lines) {
+  /**
+   * lines: strings, or {text, nameConf, timeConf} from the photo reader (confidence 0–100).
+   * opts.halfHours: snap misread minutes to :00/:30. opts.minConf: below this a row is marked unsure.
+   * Each person can carry `check` (reasons to double-check the row).
+   */
+  function parseLines(lines, opts) {
+    const o = opts || {};
+    const minConf = o.minConf == null ? 0 : o.minConf;
     const out = [];
     let pending = null;
-    for (const raw of lines) {
+    for (const item of lines || []) {
+      const raw = item && typeof item === 'object' ? item.text : item;
+      const nameConf = item && typeof item === 'object' && item.nameConf != null ? item.nameConf : 100;
+      const timeConf = item && typeof item === 'object' && item.timeConf != null ? item.timeConf : 100;
       const line = normalizeLine(raw);
       if (!line.trim()) continue;
-      let toks = findTimes(line);
+      let toks = findTimes(line, !!o.halfHours);
       const isTL = /\bTL\b|team\s*lead/i.test(line);
       if (toks.length < 2) {
         // bare hours like "Tyriq 1-6"
@@ -118,7 +140,7 @@
       }
       if (toks.length < 2) {
         const nm = cleanName(line);
-        if (nm && letters(nm) >= 2 && !isDateLine(line)) pending = { name: nm, isTL };
+        if (nm && letters(nm) >= 2 && !isDateLine(line)) pending = { name: nm, isTL, nameConf };
         else if (isDateLine(line)) pending = null;
         continue;
       }
@@ -130,6 +152,12 @@
         if (/^[\s-]*(to|until|thru)?[\s-]*$/i.test(between)) pair = [toks[i], toks[i + 1]];
       }
       if (!pair) pair = [toks[0], toks[1]];
+      const check = [];
+      if (o.halfHours) {
+        const a = snapHalfHour(pair[0]);
+        const b = snapHalfHour(pair[1]);
+        if (a || b) check.push('time-fixed');
+      }
 
       let start = resolveStart(pair[0]);
       let end = resolveEnd(pair[1], start);
@@ -139,12 +167,17 @@
 
       let name = cleanName(line.slice(0, pair[0].index));
       let tl = isTL;
+      let nConf = nameConf;
       if (letters(name) < 2 && pending) {
         name = pending.name;
         tl = tl || pending.isTL;
+        nConf = pending.nameConf;
       }
       pending = null;
-      out.push({ name: letters(name) >= 2 ? name : '', start, end, isTL: tl });
+      if (Math.min(nConf, timeConf) < minConf) check.push('unsure');
+      const person = { name: letters(name) >= 2 ? name : '', start, end, isTL: tl };
+      if (check.length) person.check = check;
+      out.push(person);
     }
     return out;
   }

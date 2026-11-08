@@ -25,6 +25,25 @@
 
   let db = Store.load();
   let settings = Sched.mergeSettings(db.settings);
+  // Photo readings below this confidence (0–100) get highlighted for a second look.
+  const UNSURE_BELOW = 50;
+
+  // Names this device has scheduled before, used to fix misread names in photos.
+  function seedNames() {
+    if (db.names && typeof db.names === 'object') return;
+    db.names = {};
+    for (const d of Object.values(db.days || {}))
+      for (const e of (d && d.employees) || []) if (e.name && e.name.trim()) rememberName(e.name, d.date);
+    for (const r of Object.values(db.roster || {})) if (r && r.name) rememberName(r.name);
+  }
+  function rememberName(name, date) {
+    const k = Sched.nameKey(name);
+    if (!k) return;
+    const prev = db.names[k];
+    db.names[k] = { name: name.trim(), n: ((prev && prev.n) || 0) + 1, last: date || (prev && prev.last) || null };
+  }
+  const knownNames = () => Object.values(db.names || {}).map((x) => x.name);
+  seedNames();
   const state = {
     date: todayISO(),
     step: null,
@@ -75,11 +94,16 @@
       if (p.name && seen.has(key)) continue;
       seen.add(key);
       const known = db.roster[Sched.nameKey(p.name)];
-      d.employees.push({ id: uid(), name: p.name || '', start: p.start, end: p.end, isTL: !!(p.isTL || (known && known.isTL)) });
+      const e = { id: uid(), name: p.name || '', start: p.start, end: p.end, isTL: !!(p.isTL || (known && known.isTL)) };
+      if (p.check && p.check.length) e.check = p.check.slice();
+      if (p.readAs) e.readAs = p.readAs;
+      d.employees.push(e);
       added++;
     }
     persist();
     const blanks = list.filter((p) => !p.name).length;
+    const toCheck = list.filter((p) => p.check && p.check.some((c) => c !== 'name-fixed')).length;
+    const fixedNames = list.filter((p) => p.readAs).length;
     const backwards = list.filter((p) => p.end <= p.start).length;
     state.notice = {
       kind: added ? 'ok' : 'warn',
@@ -87,7 +111,9 @@
         (added
           ? `Added <b>${added}</b> ${added === 1 ? 'person' : 'people'} from ${esc(source)}. `
           : `Everyone in ${esc(source)} is already on the list, so nobody new was added. `) +
-        (added && source.includes('photo') ? 'Photo reading isn’t perfect, so check names and times below. ' : '') +
+        (added && source.includes('photo') && !toCheck ? 'Photo reading isn’t perfect, so give the list a quick look. ' : '') +
+        (toCheck ? `<b>${toCheck}</b> ${toCheck === 1 ? 'row was' : 'rows were'} hard to read; ${toCheck === 1 ? 'it’s' : 'they’re'} highlighted in yellow. ` : '') +
+        (fixedNames ? `<b>${fixedNames}</b> misread ${fixedNames === 1 ? 'name was' : 'names were'} matched to people you’ve scheduled before. ` : '') +
         (blanks ? `<b>${blanks}</b> name(s) couldn’t be read; they’re highlighted in red. ` : '') +
         (backwards ? `<b>${backwards}</b> shift(s) end before they start; fix the times in red. ` : '') +
         (extraHtml || ''),
@@ -124,6 +150,9 @@
     });
     d.rows = Sched.generate(input, settings, { seed: d.seed || 1, date: state.date, history: historyFor(state.date) });
     d.savedAt = Date.now();
+    // the lead has checked these names, so remember them for reading future screenshots
+    // (rows still marked "hard to read" are skipped, so a misread name is never learned)
+    for (const e of d.employees) if (validEmployee(e) && !(e.check && e.check.includes('unsure'))) rememberName(e.name, state.date);
     persist();
   }
 
@@ -271,6 +300,24 @@
   }
 
   // ---- step 2: review
+  const CHECK_TEXT = {
+    unsure: 'Hard to read. Please double-check this row.',
+    'time-fixed': 'Time adjusted to :00 or :30. Please confirm.',
+    'odd-length': 'Unusual shift length. Please confirm.',
+    'odd-time': 'Outside department hours. Please confirm.',
+  };
+  function checkNotes(e) {
+    if (!(e.check && e.check.length) && !e.readAs) return '';
+    const notes = [];
+    if (e.readAs)
+      notes.push(
+        `<p class="field-note check-note">${icon('info')}<span>Read as “${esc(e.readAs)}”, matched to a name you’ve scheduled before. <button type="button" class="link-btn" data-act="undo-name">Undo</button></span></p>`
+      );
+    for (const c of e.check || []) if (CHECK_TEXT[c]) notes.push(`<p class="field-note check-note">${icon('alert')}<span>${CHECK_TEXT[c]}</span></p>`);
+    notes.push(`<button type="button" class="link-btn ok-btn" data-act="ok-row">${icon('check')}Looks right</button>`);
+    return `<div class="check-notes">${notes.join('')}</div>`;
+  }
+
   function viewReview() {
     const d = day(true);
     const emps = d.employees;
@@ -280,9 +327,11 @@
     const seenNames = new Map();
     for (const e of emps) if (e.name) seenNames.set(Sched.nameKey(e.name), (seenNames.get(Sched.nameKey(e.name)) || 0) + 1);
     const dupes = new Set([...seenNames].filter(([, n]) => n > 1).map(([k]) => k));
+    const toCheck = emps.filter((e) => (e.check && e.check.length) || e.readAs).length;
     const stats = `<dl class="stats">
         <div><dt>People</dt><dd>${emps.length}</dd></div>
         <div class="r-TL"><dt>Team leads</dt><dd>${leads}</dd></div>
+        ${toCheck ? `<div class="is-check"><dt>To check</dt><dd>${toCheck}</dd></div>` : ''}
         ${bad ? `<div class="is-bad"><dt>To fix</dt><dd>${bad}</dd></div>` : ''}
       </dl>`;
     return `
@@ -298,11 +347,12 @@
                   const okTimes = e.start != null && e.end != null && e.end > e.start;
                   const len = okTimes ? Sched.lunchLength(e.start, e.end, settings) : 0;
                   const label = e.name ? esc(e.name) : `row ${i + 1}`;
-                  return `<tr data-id="${e.id}">
+                  const flagged = (e.check && e.check.length) || e.readAs;
+                  return `<tr data-id="${e.id}" class="${flagged ? 'needs-check' : ''}">
                     <td class="c-num">${i + 1}</td>
                     <td class="c-name"><input type="text" data-f="name" value="${esc(e.name)}" placeholder="Name" aria-label="Name, row ${i + 1}" autocomplete="off" class="${e.name ? '' : 'bad-input'}" />${
                       e.name && dupes.has(Sched.nameKey(e.name)) ? `<p class="field-note warn">${icon('alert')}Same name appears more than once</p>` : ''
-                    }${okTimes ? '' : `<p class="field-note bad">${icon('alert')}End must be after start</p>`}</td>
+                    }${okTimes ? '' : `<p class="field-note bad">${icon('alert')}End must be after start</p>`}${checkNotes(e)}</td>
                     <td class="c-start" data-label="Start"><input type="time" step="1800" data-f="start" value="${T.toInput(e.start)}" aria-label="Start time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
                     <td class="c-end" data-label="End"><input type="time" step="1800" data-f="end" value="${T.toInput(e.end)}" aria-label="End time for ${label}" class="${okTimes ? '' : 'bad-input'}" /></td>
                     <td class="c-hrs num" data-label="Hours" data-hrs>${okTimes ? T.hours(e.start, e.end) : '–'}</td>
@@ -338,7 +388,7 @@
       ${
         ocr
           ? `<details class="panel disclosure"><summary>${icon('info')}What the photo reader saw <span class="muted">(for troubleshooting)</span></summary>
-             <textarea readonly aria-label="Text the photo reader saw">${esc(ocr.map((r, i) => `--- screenshot ${i + 1} ---\n` + r.lines.join('\n')).join('\n'))}</textarea></details>`
+             <textarea readonly aria-label="Text the photo reader saw">${esc(ocr.map((r, i) => `--- screenshot ${i + 1} ---\n` + r.lines.map((l) => (l && typeof l === 'object' ? l.text : l)).join('\n')).join('\n'))}</textarea></details>`
           : ''
       }`;
   }
@@ -1009,6 +1059,8 @@
       const progress = (frac, label) => {
         // loading/preparing report their own 0–1 progress; only real reading moves the bar
         if (/^(Loading|Preparing)/.test(label)) frac = 0;
+        else if (/^Double/.test(label)) frac = 0.8 + 0.2 * (frac || 0); // second look at the times
+        else if (/^Reading/.test(label) && !f.pdf) frac = 0.8 * (frac || 0);
         state.progress = { i, f: frac, label };
         const bar = $('#progBar');
         const lab = $('#progLabel');
@@ -1029,7 +1081,8 @@
     state.reading = false;
     state.lastOcr = res.length ? res : null;
     const found = [];
-    res.forEach((r) => found.push(...Parser.parseLines(r.lines)));
+    res.forEach((r) => found.push(...Parser.parseLines(r.lines, { halfHours: true, minConf: UNSURE_BELOW })));
+    found.splice(0, found.length, ...window.WS.ReadFix.apply(found, { known: knownNames(), settings, fromPhoto: true }));
     // keep only the files that failed in the list so they can be removed or retried
     state.files.filter((x) => !failed.some((y) => y.f === x)).forEach((x) => x.url && URL.revokeObjectURL(x.url));
     state.files = failed.map((y) => y.f);
@@ -1104,6 +1157,28 @@
         render();
         const inputs = app.querySelectorAll('input[data-f="name"]');
         inputs[inputs.length - 1]?.focus();
+        break;
+      }
+      case 'undo-name': {
+        const e = d.employees.find((x) => x.id === tr.dataset.id);
+        if (e && e.readAs) {
+          e.name = e.readAs;
+          delete e.readAs;
+          e.check = (e.check || []).filter((c) => c !== 'name-fixed');
+          if (!e.check.length) delete e.check;
+          persist();
+          render();
+        }
+        break;
+      }
+      case 'ok-row': {
+        const e = d.employees.find((x) => x.id === tr.dataset.id);
+        if (e) {
+          delete e.check;
+          delete e.readAs;
+          persist();
+          render();
+        }
         break;
       }
       case 'rm-emp':
@@ -1229,6 +1304,12 @@
     const e = day(true).employees.find((x) => x.id === tr.dataset.id);
     if (!e) return;
     const f = el.dataset.f;
+    if ((f === 'name' || f === 'start' || f === 'end') && (e.check || e.readAs)) {
+      delete e.check;
+      delete e.readAs;
+      tr.classList.remove('needs-check');
+      tr.querySelector('.check-notes')?.remove();
+    }
     if (f === 'name') {
       e.name = el.value;
       el.classList.toggle('bad-input', !el.value.trim());
@@ -1567,6 +1648,7 @@
             <button class="btn" type="button" data-h="import">${icon('upload')}Restore from backup…</button>
             <input type="file" id="backupIn" accept="application/json,.json" hidden />
             <span class="spacer"></span>
+            <button class="btn ghost" type="button" data-h="forget-names" ${Object.keys(db.names || {}).length ? '' : 'disabled'}>Forget remembered names (${Object.keys(db.names || {}).length})</button>
             <button class="btn ghost danger" type="button" data-h="wipe">${icon('trash')}Erase everything</button>
           </div>
         </fieldset>
@@ -1591,10 +1673,17 @@
       render();
     } else if (act === 'export') download(`opd-schedule-backup-${todayISO()}.json`, Store.exportJSON(db), 'application/json');
     else if (act === 'import') $('#backupIn').click();
-    else if (act === 'wipe') {
+    else if (act === 'forget-names') {
+      if (!confirm('Forget the names this browser remembers for fixing photo readings? Saved days stay.')) return;
+      db.names = {};
+      persist();
+      openHistory();
+      toast('Remembered names cleared.');
+    } else if (act === 'wipe') {
       if (!confirm('Erase every saved day, team lead list and setting in this browser? This can’t be undone.')) return;
       Store.clear();
       db = Store.load();
+      seedNames();
       settings = Sched.mergeSettings(null);
       state.step = 'import';
       histDlg.close();
@@ -1608,6 +1697,7 @@
       const next = Store.importJSON(await ev.target.files[0].text());
       if (!confirm('Replace what’s saved in this browser with this backup?')) return;
       db = next;
+      seedNames();
       settings = Sched.mergeSettings(db.settings);
       persist();
       state.step = defaultStep();
