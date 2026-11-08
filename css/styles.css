@@ -2183,7 +2183,7 @@ thead th {
   min-width: 380px;
   width: 38%;
 }
-.tl {
+div.tl {
   position: relative;
   height: 22px;
   border-radius: 4px;
@@ -3367,9 +3367,6 @@ thead th {
   .print-table td.num {
     text-align: right;
   }
-  .print-table tr.tl td {
-    font-weight: 700;
-  }
   .print-head {
     margin: 0 0 6px;
     text-align: center;
@@ -3610,6 +3607,33 @@ thead th {
   }
   .fs-sep {
     color: #888;
+  }
+  .fs-floor-sec {
+    break-inside: avoid;
+  }
+  .fs-floor th,
+  .fs-floor td {
+    padding: 2px 0;
+    text-align: center;
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .fs-floor thead th.half {
+    font-weight: 400;
+    color: #555;
+  }
+  .fs-floor .fs-fl,
+  .fs-floor tbody th {
+    width: 78px;
+    padding-left: 4px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    background: #f2f2f2;
+  }
+  .fs-floor td.fs-low {
+    background: #bdbdbd !important;
+    font-weight: 700;
   }
   .print-chart {
     page: chart;

@@ -835,6 +835,49 @@
       </section>`
       : '';
 
+    // Who's on the floor, every half hour (same numbers as the on-screen tab). Before dispensing
+    // opens, dispensers are picking, so they count as pickers there.
+    const a = Sched.analyze(rows, settings);
+    const open = settings.dispOpen;
+    const singlesOn = enabledSingles();
+    const floorRow = (label, cells) => `<tr><th scope="row">${label}</th>${cells.join('')}</tr>`;
+    const cell = (v, low) => `<td class="${low ? 'fs-low' : ''}">${v}</td>`;
+    const floor = a.slots.length
+      ? `<section class="fs-sec fs-floor-sec">
+        <h2>Who’s on the floor <small>every half hour: people actually working each job, not at lunch · bold gray = short</small></h2>
+        <table class="fs-table fs-floor">
+          <thead><tr><th class="fs-fl">Time</th>${a.slots
+            .map((x) => `<th class="${x.t % 60 ? 'half' : ''}">${x.t % 60 ? ':30' : T.short(x.t)}</th>`)
+            .join('')}</tr></thead>
+          <tbody>
+            ${floorRow(
+              'Pickers',
+              a.slots.map((x) => {
+                const v = x.t < open ? x.PICK + x.DISP : x.PICK;
+                return cell(v, x.staff > 0 && v < settings.minPick);
+              })
+            )}
+            ${floorRow(
+              'Dispensers',
+              a.slots.map((x) =>
+                x.t < open ? cell('–', false) : cell(x.DISP, x.staff > 0 && x.t >= settings.dispFrom && x.t < settings.dispTo && x.DISP < settings.minDisp)
+              )
+            )}
+            ${singlesOn
+              .map((k) =>
+                floorRow(
+                  esc(k === 'PREP' ? 'Prep (PR)' : roleLong(k)),
+                  a.slots.map((x) => (x.need[k] ? cell(x.single[k] >= x.need[k] ? '✓' : '✗', x.single[k] < x.need[k]) : cell('·', false)))
+                )
+              )
+              .join('')}
+            ${floorRow('At lunch', a.slots.map((x) => cell(x.lunch || '·', false)))}
+          </tbody>
+        </table>
+        <p class="fs-key">Before ${T.fmt(open)}, dispensers are picking and are counted as pickers. ✓ = job covered, ✗ = nobody on it, · = not needed.</p>
+      </section>`
+      : '';
+
     return `<div class="print-floor">
       ${printHead('Floor sheet · ' + niceDate(state.date), rows)}
       <p class="fs-key fs-key-top"><i class="k k-shift"></i>shift &nbsp; <i class="k fs-lunchc">9–10</i>lunch &nbsp; <i class="k k-cover">PR</i>covering a lunch</p>
@@ -842,6 +885,7 @@
       ${gantt('Backroom &amp; Prep', 'BR + PR', brpr)}
       ${dispGrid}
       ${roster}
+      ${floor}
     </div>`;
   }
 
@@ -864,7 +908,7 @@
         <thead><tr><th>Name</th><th>Start</th><th>End</th><th>Hours</th><th>Lunch</th><th>Assignment</th><th>Cover</th></tr></thead>
         <tbody>${rows
           .map(
-            (r) => `<tr class="${r.role === 'DISP' ? 'shade' : ''}${r.isTL ? ' tl' : ''}"><td>${esc(r.name)}</td><td class="num">${T.fmt(r.start)}</td><td class="num">${T.fmt(
+            (r) => `<tr class="${r.role === 'DISP' ? 'shade' : ''}"><td>${r.isTL ? `<b>${esc(r.name)}</b>` : esc(r.name)}</td><td class="num">${T.fmt(r.start)}</td><td class="num">${T.fmt(
               r.end
             )}</td><td class="num">${T.hours(r.start, r.end)}</td><td>${r.lunch != null && r.lunchLen ? T.range(r.lunch, r.lunch + r.lunchLen) : ''}</td><td>${esc(
               roleLabel(r.role)
